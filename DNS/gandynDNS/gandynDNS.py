@@ -1,6 +1,14 @@
 #!/usr/bin/python
 """ GandynDNS - this script get your public IP and change your Gandi DNS entry 
+		
+		************ DEPRECATED ************
 
+		This use the old V3 API which is now deprecated. 
+		Use Gandi v5 LiveDNS instead.
+
+		************ DEPRECATED ************
+
+		
     Prune@lecentre.net - 2013
 
 """
