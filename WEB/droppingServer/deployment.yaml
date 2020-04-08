@@ -1,0 +1,40 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  labels:
+    app: droppingserver
+    project: droppingserver
+    version: v1
+  name: droppingserver
+spec:
+  replicas: 1
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app: droppingserver
+      name: droppingserver
+      project: droppingserver
+      version: v1
+  template:
+    metadata:
+      labels:
+        app: droppingserver
+        name: droppingserver
+        project: droppingserver
+        version: v1
+    spec:
+      containers:
+      - name: droppingserver
+        image: prune/droppingserver:v0.0.1
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8080
+          name: http
+          protocol: TCP
+        resources:
+          limits:
+            cpu: 300m
+            memory: 300Mi
+          requests:
+            cpu: 200m
+            memory: 180Mi
