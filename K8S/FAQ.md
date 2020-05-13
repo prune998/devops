@@ -7,7 +7,7 @@ List resources with Finalizers in a namespace:
 
 ```bash
 # example for istio-system namespace
-kubectl api-resources --verbs=list --namespaced -o name   | xargs -n 1 kubectl get --show-kind --ignore-not-found -n istio-system
+kubectl api-resources --verbs=list --namespaced -o name   | xargs -n 1 kubectl get --show-kind --ignore-not-found --no-headers -o name -n istio-system
 
 NAME                                                   AGE
 istiooperator.install.istio.io/istiod   132m

@@ -15,8 +15,12 @@ func main() {
 	http.HandleFunc("/world", helloWorldHandler)
 	http.HandleFunc("/slow", slowHandler)
 
+	fmt.Println("Listening on port 8443 for TLS")
+	go http.ListenAndServeTLS(":8443", "server.crt", "server.key", nil)
+
 	fmt.Println("Listening on port 8080")
 	http.ListenAndServe(":8080", nil)
+
 }
 
 // defaultHandler just return OK
