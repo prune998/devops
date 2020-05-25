@@ -16,3 +16,9 @@ istiooperator.install.istio.io/istiod   132m
 kubectl -n istio-system edit istiooperator istiod
 # Then delete the finalizer from the resource yaml and save
 ```
+
+# Istio
+
+## Limit config sent to a Gateway
+
+set `PILOT_FILTER_GATEWAY_CLUSTER_CONFIG` to `true`
