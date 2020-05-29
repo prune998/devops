@@ -1,0 +1,21 @@
+{
+  "CN": "host.custom.com",
+  "key": {
+    "algo": "rsa",
+    "size": 2048
+  },
+  "names": [
+  {
+    "C": "CA",
+    "L": "Quebec",
+    "O": "Custom",
+    "OU": "Custom Certificate",
+    "ST": "Quebec"
+  }
+  ],
+  "hosts": [
+    "host1.custom.com",
+    "localhost",
+    "192.168.0.152"
+  ]
+}
