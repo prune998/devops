@@ -16,6 +16,7 @@ func main() {
 
 	r.HandleFunc("/", defaultHandler)
 	r.HandleFunc("/hj", hjHandler)
+	r.HandleFunc("/dup", dupHeaderHandler)
 	r.HandleFunc("/world", helloWorldHandler)
 	r.HandleFunc("/slow", slowHandler)
 	r.HandleFunc("/status/{code}", statusHandler)
@@ -31,6 +32,26 @@ func main() {
 // defaultHandler just return OK
 func defaultHandler(w http.ResponseWriter, r *http.Request) {
 	io.WriteString(w, "OK")
+}
+
+// dupHeaderHandler hihack the connexion and send a duplicated header
+func dupHeaderHandler(w http.ResponseWriter, r *http.Request) {
+
+	hj, ok := w.(http.Hijacker)
+	if !ok {
+		http.Error(w, "webserver doesn't support hijacking", http.StatusInternalServerError)
+		return
+	}
+
+	conn, bufrw, err := hj.Hijack()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	// Don't forget to close the connection:
+	defer conn.Close()
+	bufrw.WriteString("HTTP/1.1 200 OK\nContent-Length: 2\nx-content-type-options: nosniff\nx-content-type-options: nosniff\nContent-Type: text/plain; charset=utf-8\n\nOK")
+	bufrw.Flush()
 }
 
 // hjHandler hihack the connexion and send data before the server can return it's HTTP headers

@@ -8,6 +8,7 @@ The server implemented features:
 - reply "Hello World!" on a `GET /world`
 - reply "Hello World!" on a `GET /slow` request, waiting 20s by default or use the `?delay=60` to the request to wait for 60s
 - reply with bogus data on a `GET /hj` request. In this case, the server will send some trash on the line before the regular HTTP headers, leading to (usually) a 503 error on a proxy
+- reply with a duplicate header on a `GET /dup`
 
 ## Usage
 
