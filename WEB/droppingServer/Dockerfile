@@ -17,4 +17,5 @@ COPY --from=builder /go/bin/droppingServer /droppingServer
 COPY server.crt /server.crt
 COPY server.key /server.key
 EXPOSE 8080
+EXPOSE 8443
 ENTRYPOINT ["/droppingServer"]
