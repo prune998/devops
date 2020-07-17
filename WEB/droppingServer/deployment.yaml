@@ -17,6 +17,8 @@ spec:
       version: v1
   template:
     metadata:
+      annotations:
+        nosidecar.istio.io/inject: "false"
       labels:
         app: droppingserver
         name: droppingserver

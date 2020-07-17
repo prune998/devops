@@ -17,6 +17,7 @@ func main() {
 	r.HandleFunc("/", defaultHandler)
 	r.HandleFunc("/hj", hjHandler)
 	r.HandleFunc("/dup", dupHeaderHandler)
+	r.HandleFunc("/dup2", dupHeaderHandler2)
 	r.HandleFunc("/world", helloWorldHandler)
 	r.HandleFunc("/slow", slowHandler)
 	r.HandleFunc("/status/{code}", statusHandler)
@@ -34,7 +35,7 @@ func defaultHandler(w http.ResponseWriter, r *http.Request) {
 	io.WriteString(w, "OK")
 }
 
-// dupHeaderHandler hihack the connexion and send a duplicated header
+// dupHeaderHandler hihack the connexion and send a duplicated 'Transfer-Encoding: chunked' header
 func dupHeaderHandler(w http.ResponseWriter, r *http.Request) {
 
 	hj, ok := w.(http.Hijacker)
@@ -50,7 +51,27 @@ func dupHeaderHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	// Don't forget to close the connection:
 	defer conn.Close()
-	bufrw.WriteString("HTTP/1.1 200 OK\nContent-Length: 2\nx-content-type-options: nosniff\nx-content-type-options: nosniff\nContent-Type: text/plain; charset=utf-8\n\nOK")
+	bufrw.WriteString("HTTP/1.1 200 OK\r\nx-content-type-options: nosniff\r\nTransfer-Encoding: chunked\r\nx-content-type-options: nosniff\r\nContent-Type: text/plain; charset=utf-8\r\nTransfer-Encoding: chunked\r\n\r\n2\r\nOK\r\n0\r\n")
+	bufrw.Flush()
+}
+
+// dupHeaderHandler hihack the connexion and send a duplicated header
+func dupHeaderHandler2(w http.ResponseWriter, r *http.Request) {
+
+	hj, ok := w.(http.Hijacker)
+	if !ok {
+		http.Error(w, "webserver doesn't support hijacking", http.StatusInternalServerError)
+		return
+	}
+
+	conn, bufrw, err := hj.Hijack()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	// Don't forget to close the connection:
+	defer conn.Close()
+	bufrw.WriteString("HTTP/1.1 200 OK\r\nContent-Length: 2\r\nx-content-type-options: nosniff\r\nx-content-type-options: nosniff\r\nContent-Type: text/plain; charset=utf-8\r\n\r\nOK")
 	bufrw.Flush()
 }
 
