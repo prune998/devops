@@ -5,13 +5,37 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"os"
+	"runtime"
 	"strconv"
 	"time"
 
 	"github.com/gorilla/mux"
+	"github.com/namsral/flag"
 )
 
+var (
+	version        = "no version set"
+	displayVersion = flag.Bool("version", false, "Show version and quit")
+	logLevel       = flag.String("logLevel", "warn", "log level from debug, info, warning, error. When debug, genetate 100% Tracing")
+	httpPort       = flag.String("httpPort", ":8080", "IP and port to bind for HTTP connections, localhost:8080 or :8080 (default)")
+	httpsPort      = flag.String("httpsPort", ":8443", "IP and port to bind for HTTPS connections, localhost:8443 or :8443 (default)")
+)
+
+func printVersion() {
+	fmt.Printf("Go Version: %s", runtime.Version())
+	fmt.Printf("Go OS/Arch: %s/%s", runtime.GOOS, runtime.GOARCH)
+	fmt.Printf("vuedashd Version: %v", version)
+}
+
 func main() {
+	// parse flags
+	flag.Parse()
+	if *displayVersion {
+		printVersion()
+		os.Exit(0)
+	}
+
 	r := mux.NewRouter()
 
 	r.HandleFunc("/", defaultHandler)
@@ -22,11 +46,11 @@ func main() {
 	r.HandleFunc("/slow", slowHandler)
 	r.HandleFunc("/status/{code}", statusHandler)
 
-	fmt.Println("Listening on port 8443 for TLS")
-	go http.ListenAndServeTLS(":8443", "server.crt", "server.key", r)
+	fmt.Println("Listening on port", *httpsPort, "for TLS")
+	go http.ListenAndServeTLS(*httpsPort, "server.crt", "server.key", r)
 
-	fmt.Println("Listening on port 8080")
-	http.ListenAndServe(":8080", r)
+	fmt.Println("Listening on port", *httpPort, "for plain HTTP")
+	http.ListenAndServe(*httpPort, r)
 
 }
 
