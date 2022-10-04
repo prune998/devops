@@ -40,6 +40,121 @@ pods                                                                            
 monitoringmetricdescriptors             gcpmonitoringmetricdescriptor,gcpmonitoringmetricdescriptors                       monitoring.cnrm.cloud.google.com/v1beta1             true         MonitoringMetricDescriptor             [delete deletecollection get list patch create update watch]
 ```
 
+## list Nodes metrics
+
+```bash
+kubectl get --raw "/apis/metrics.k8s.io/v1beta1/nodes"|jq '.'
+
+{
+  "kind": "NodeMetricsList",
+  "apiVersion": "metrics.k8s.io/v1beta1",
+  "metadata": {},
+  "items": [
+    {
+      "metadata": {
+        "name": "gke-qa-us-central--auto-reply-pool-ad94ddd8-f132",
+        "creationTimestamp": "2022-10-04T13:35:39Z",
+        "labels": {
+          "beta.kubernetes.io/arch": "amd64",
+          "beta.kubernetes.io/instance-type": "e2-standard-2",
+          "beta.kubernetes.io/os": "linux",
+          "cloud.google.com/gke-boot-disk": "pd-ssd",
+          "cloud.google.com/gke-container-runtime": "containerd",
+          "cloud.google.com/gke-cpu-scaling-level": "2",
+          "cloud.google.com/gke-max-pods-per-node": "110",
+          "cloud.google.com/gke-netd-ready": "true",
+          "cloud.google.com/gke-nodepool": "auto-reply-pool",
+          "cloud.google.com/gke-os-distribution": "cos",
+          "cloud.google.com/machine-family": "e2",
+          "failure-domain.beta.kubernetes.io/region": "us-central1",
+          "failure-domain.beta.kubernetes.io/zone": "us-central1-a",
+          "iam.gke.io/gke-metadata-server-enabled": "true",
+          "instance_labels_synced": "true",
+          "k8s-nodepool-labeler": "13846344126847483082",
+          "k8s_cluster": "qa-us-central-cluster",
+          "kubernetes.io/arch": "amd64",
+          "kubernetes.io/hostname": "gke-qa-us-central--auto-reply-pool-ad94ddd8-f132",
+          "kubernetes.io/os": "linux",
+          "node.kubernetes.io/instance-type": "e2-standard-2",
+          "node.kubernetes.io/masq-agent-ds-ready": "true",
+          "nodePool": "auto-reply-pool",
+          "projectcalico.org/ds-ready": "true",
+          "service": "auto-reply",
+          "topology.gke.io/zone": "us-central1-a",
+          "topology.kubernetes.io/region": "us-central1",
+          "topology.kubernetes.io/zone": "us-central1-a"
+        }
+      },
+      "timestamp": "2022-10-04T13:35:24Z",
+      "window": "30s",
+      "usage": {
+        "cpu": "170334843n",
+        "memory": "1636980Ki"
+      }
+    },
+    ...
+
+
+# Get the metrics for one nodes
+kubectl get --raw /apis/metrics.k8s.io/v1beta1/nodes/NODE_NAME
+```
+
+We can see each node expose the `cpu` and `memory` metrics.
+
+## list Pods metrics
+
+```bash
+kubectl get --raw "/apis/metrics.k8s.io/v1beta1/pods "|jq '.'
+
+{
+  "kind": "PodMetricsList",
+  "apiVersion": "metrics.k8s.io/v1beta1",
+  "metadata": {},
+  "items": [
+    {
+    {
+      "metadata": {
+        "name": "auto-reply-584d9b45f5-6bhqx",
+        "namespace": "auto-reply-v2",
+        "creationTimestamp": "2022-10-04T13:37:22Z",
+        "labels": {
+          "app.kubernetes.io/instance": "auto-reply",
+          "app.kubernetes.io/name": "auto-reply",
+          "pod-template-hash": "584d9b45f5",
+          "security.istio.io/tlsMode": "istio",
+          "service.istio.io/canonical-name": "auto-reply",
+          "service.istio.io/canonical-revision": "latest",
+          "sidecar.istio.io/inject": "true",
+          "topology.istio.io/network": "qa"
+        }
+      },
+      "timestamp": "2022-10-04T13:36:51Z",
+      "window": "30s",
+      "containers": [
+        {
+          "name": "auto-reply",
+          "usage": {
+            "cpu": "109630n",
+            "memory": "13436Ki"
+          }
+        },
+        {
+          "name": "istio-proxy",
+          "usage": {
+            "cpu": "11094142n",
+            "memory": "110272Ki"
+          }
+        }
+      ]
+    },
+    ...
+    
+
+# Get the metrics for one pods
+kubectl get --raw /apis/metrics.k8s.io/v1beta1/namespaces/NAMESPACE/pods/POD_NAME
+```
+Here again we expose  `cpu` and `memory` metrics for each container in each pod.
+
 ## list cutom metrics
 
 ```bash
@@ -51,4 +166,12 @@ kubectl get --raw "/apis/custom.metrics.k8s.io/v1beta1"
 ```bash
 kubectl get --raw "/apis/external.metrics.k8s.io/v1beta1"
 
+```
+
+# Pod management
+
+## Delete all Terminated pods
+
+```bash
+kubectl get pods --all-namespaces | grep -i Terminated | awk '{print $1, $2}' | xargs -n2 kubectl delete pod -n
 ```
