@@ -23,6 +23,16 @@ kubectl -n istio-system edit istiooperator istiod
 
 set `PILOT_FILTER_GATEWAY_CLUSTER_CONFIG` to `true`
 
+## Start a debug pod with Istio injected
+
+```bash
+kubectl run -it --rm --labels="sidecar.istio.io/inject=true" --image=debian:latest
+apt update && apt install -y dnsutils
+
+dig +noall +answer xxx
+...
+```
+
 # Custom Metrics
 
 Custom metrics are generated when you install a metrics adapter. See [this blog post](https://medium.com/uptime-99/kubernetes-hpa-autoscaling-with-custom-and-external-metrics-da7f41ff7846).
