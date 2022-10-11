@@ -50,6 +50,17 @@ pods                                                                            
 monitoringmetricdescriptors             gcpmonitoringmetricdescriptor,gcpmonitoringmetricdescriptors                       monitoring.cnrm.cloud.google.com/v1beta1             true         MonitoringMetricDescriptor             [delete deletecollection get list patch create update watch]
 ```
 
+## check which Service answer an API
+
+```bash
+ k get APIService | grep metric
+
+NAME                                   SERVICE                      AVAILABLE   AGE
+v1beta1.custom.metrics.k8s.io          ops/kube-metrics-adapter     True        638d
+v1beta1.external.metrics.k8s.io        ops/kube-metrics-adapter     True        638d
+v1beta1.metrics.k8s.io                 kube-system/metrics-server   True        3y278d
+```
+
 ## list Nodes metrics
 
 ```bash
