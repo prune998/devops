@@ -1,0 +1,52 @@
+package main
+
+import (
+	"context"
+
+	"cloud.google.com/go/compute"
+	"cloud.google.com/go/computepb"
+	"github.com/namsral/flag"
+	"google.golang.org/api/iterator"
+)
+
+var (
+	projectID     = flag.String("project_id", "", "Google Project ID")
+	kind          = flag.String("kind", "", "kind of object to parse: pubsub, storage, datasets (bigquery), redis, functions, computedisk, computeinstance, secrets, bigtable")
+	fetchProjects = flag.Bool("fetchProjects", false, "set to True to get the project mapping from ID to name, warning: this is slow as there is no cache")
+	data          interface{}
+	instanceName  = "test-api-go-client"
+)
+
+type Project struct {
+	Name          string `json:"name"`
+	ProjectId     string `json:"projectId"`
+	ProjectNumber string `json:"projectNumber"`
+}
+
+func main() {
+	flag.Parse()
+
+	ctx := context.Background()
+	c, err := compute.NewAcceleratorTypesRESTClient(ctx)
+	if err != nil {
+		// TODO: Handle error.
+	}
+	defer c.Close()
+
+	req := &computepb.AggregatedListAcceleratorTypesRequest{
+		// TODO: Fill request struct fields.
+		// See https://pkg.go.dev/google.golang.org/genproto/googleapis/cloud/compute/v1#AggregatedListAcceleratorTypesRequest.
+	}
+	it := c.AggregatedList(ctx, req)
+	for {
+		resp, err := it.Next()
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			// TODO: Handle error.
+		}
+		// TODO: Use resp.
+		_ = resp
+	}
+}
