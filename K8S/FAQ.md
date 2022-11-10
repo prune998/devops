@@ -1,5 +1,7 @@
 # FAQ for Kubernetes
 
+# Search things
+
 ## Find resources with Finalizers
 
 It may happen that a resource stay pending on `Terminating` state. It usually means the resource is waiting for a `Finalizer` to complete. If the Finalizer is an Operator that you already removed, it will never complete (and remove) the Finilazer.
@@ -15,6 +17,14 @@ istiooperator.install.istio.io/istiod   132m
 
 kubectl -n istio-system edit istiooperator istiod
 # Then delete the finalizer from the resource yaml and save
+```
+
+## List pods per UID
+
+This is useful to find a pod when you know the UID as found in the filesystem of the node:
+
+```bash
+k --context gke_bx-production-ops_us-east4_prod-ops-cluster get pods -n ops -o custom-columns=PodName:.metadata.name,PodUID:.metadata.uid
 ```
 
 # Istio
