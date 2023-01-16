@@ -206,3 +206,23 @@ kubectl get --raw "/apis/external.metrics.k8s.io/v1beta1"
 ```bash
 kubectl get pods --all-namespaces | grep -i Terminated | awk '{print $1, $2}' | xargs -n2 kubectl delete pod -n
 ```
+
+# Helm
+
+## Debug release issues
+
+```bash
+# List all releases
+helm list -a
+
+# List history of a specific release
+helm hist <releasename>
+
+# rollback to a release (that deployed successfully)
+helm rollback <releasename> <versionnumber>
+
+# Remove a release
+helm uninstall -n <name_space> <release>
+
+# Force remove a release 
+helm uninstall -n <name_space> <release> --no-hooks
