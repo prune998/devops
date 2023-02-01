@@ -1,5 +1,20 @@
 # FAQ for Kubernetes
 
+# Debug things
+
+## Run an ubuntu pod for debug
+
+```bash
+kubectl run my-shell --rm -i --tty --image ubuntu -- bash
+```
+
+then
+
+```bash
+apt update
+apt install vim wget curl dnsutils
+```
+
 # Search things
 
 ## Find resources with Finalizers
@@ -41,6 +56,78 @@ apt update && apt install -y dnsutils
 
 dig +noall +answer xxx
 ...
+```
+
+## Add Access Logs to an istio-proxy
+
+Deploy this `EnvoyFilter` in the same namespace as the resources (pods): 
+
+[ref](https://github.com/istio/istio.io/issues/7613)
+
+```yaml
+apiVersion: networking.istio.io/v1alpha3
+kind: EnvoyFilter
+metadata:
+  name: enable-accesslog
+  namespace: <yournamespace>
+spec:
+  configPatches:
+  - applyTo: NETWORK_FILTER
+    match:
+      listener:
+        filterChain:
+          filter:
+            name: "envoy.filters.network.http_connection_manager"
+    patch:
+      operation: MERGE
+      value:
+        typed_config:
+          "@type": "type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager"
+          access_log:
+          - name: envoy.access_loggers.file
+            typed_config:
+              "@type": "type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog"
+              path: /dev/stdout
+              format: "[%START_TIME%] \"%REQ(:METHOD)% %REQ(X-ENVOY-ORIGINAL-PATH?:PATH)% %PROTOCOL%\" %RESPONSE_CODE% %RESPONSE_FLAGS% \"%DYNAMIC_METADATA(istio.mixer:status)%\" \"%UPSTREAM_TRANSPORT_FAILURE_REASON%\" %BYTES_RECEIVED% %BYTES_SENT% %DURATION% %RESP(X-ENVOY-UPSTREAM-SERVICE-TIME)% \"%REQ(X-FORWARDED-FOR)%\" \"%REQ(USER-AGENT)%\" \"%REQ(X-REQUEST-ID)%\" \"%REQ(:AUTHORITY)%\" \"%UPSTREAM_HOST%\" %UPSTREAM_CLUSTER% %UPSTREAM_LOCAL_ADDRESS% %DOWNSTREAM_LOCAL_ADDRESS% %DOWNSTREAM_REMOTE_ADDRESS% %REQUESTED_SERVER_NAME% %ROUTE_NAME%\n"
+```
+
+## Add Access Logs to an Istio Ingress Gateway
+
+You have to restart the pods for the config to be applied
+
+Replace `istio:  istio-internal-ingressgateway` with any selector (label) that you used to define your gateway
+
+[ref](https://github.com/istio/istio.io/issues/7613)
+
+```yaml
+apiVersion: networking.istio.io/v1alpha3
+kind: EnvoyFilter
+metadata:
+  name: ingress-gateway-accesslog
+  namespace: istio-system
+spec:
+  workloadSelector:
+    labels:
+      istio: istio-internal-ingressgateway
+  configPatches:
+  - applyTo: NETWORK_FILTER
+    match:
+      context: GATEWAY
+      listener:
+        filterChain:
+          filter:
+            name: "envoy.filters.network.http_connection_manager"
+    patch:
+      operation: MERGE
+      value:
+        typed_config:
+          "@type": "type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager"
+          access_log:
+          - name: envoy.access_loggers.file
+            typed_config:
+              "@type": "type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog"
+              path: /dev/stdout
+              format: "[%START_TIME%] \"%REQ(:METHOD)% %REQ(X-ENVOY-ORIGINAL-PATH?:PATH)% %PROTOCOL%\" %RESPONSE_CODE% %RESPONSE_FLAGS% \"%DYNAMIC_METADATA(istio.mixer:status)%\" \"%UPSTREAM_TRANSPORT_FAILURE_REASON%\" %BYTES_RECEIVED% %BYTES_SENT% %DURATION% %RESP(X-ENVOY-UPSTREAM-SERVICE-TIME)% \"%REQ(X-FORWARDED-FOR)%\" \"%REQ(USER-AGENT)%\" \"%REQ(X-REQUEST-ID)%\" \"%REQ(:AUTHORITY)%\" \"%UPSTREAM_HOST%\" %UPSTREAM_CLUSTER% %UPSTREAM_LOCAL_ADDRESS% %DOWNSTREAM_LOCAL_ADDRESS% %DOWNSTREAM_REMOTE_ADDRESS% %REQUESTED_SERVER_NAME% %ROUTE_NAME%\n"
 ```
 
 # Custom Metrics
