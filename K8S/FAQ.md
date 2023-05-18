@@ -313,3 +313,15 @@ helm uninstall -n <name_space> <release>
 
 # Force remove a release 
 helm uninstall -n <name_space> <release> --no-hooks
+```
+
+# Kubernetes CRDs
+
+## List all resources of ALL CRDs in a namespace
+
+This is a really slow operation as it will `k get` on every resource...
+
+```bash
+NAMESPACE="prune"
+kubectl api-resources --verbs=list --namespaced -o name | xargs -n 1 kubectl get --show-kind --ignore-not-found -n ${NAMESPACE}
+```
