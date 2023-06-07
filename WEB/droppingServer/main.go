@@ -23,9 +23,9 @@ var (
 )
 
 func printVersion() {
-	fmt.Printf("Go Version: %s", runtime.Version())
-	fmt.Printf("Go OS/Arch: %s/%s", runtime.GOOS, runtime.GOARCH)
-	fmt.Printf("vuedashd Version: %v", version)
+	fmt.Printf("Go Version: %s\n", runtime.Version())
+	fmt.Printf("Go OS/Arch: %s/%s\n", runtime.GOOS, runtime.GOARCH)
+	fmt.Printf("App Version: %v\n", version)
 }
 
 func main() {
