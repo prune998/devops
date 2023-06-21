@@ -58,7 +58,18 @@ dig +noall +answer xxx
 ...
 ```
 
-## Add Access Logs to an istio-proxy
+## Change Istio Proxy Loglevel
+
+You can add an annotation to the deploymnet:
+
+```yaml
+  template:
+    metadata:
+      annotations:
+        "sidecar.istio.io/agentLogLevel": all:warn
+```
+
+## Enable Access Logs to an istio-proxy
 
 Deploy this `EnvoyFilter` in the same namespace as the resources (pods): 
 
@@ -92,6 +103,8 @@ spec:
 ```
 
 ## Add Access Logs to an Istio Ingress Gateway
+
+### Using an Envoyfilter 
 
 You have to restart the pods for the config to be applied
 
@@ -128,6 +141,42 @@ spec:
               "@type": "type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog"
               path: /dev/stdout
               format: "[%START_TIME%] \"%REQ(:METHOD)% %REQ(X-ENVOY-ORIGINAL-PATH?:PATH)% %PROTOCOL%\" %RESPONSE_CODE% %RESPONSE_FLAGS% \"%DYNAMIC_METADATA(istio.mixer:status)%\" \"%UPSTREAM_TRANSPORT_FAILURE_REASON%\" %BYTES_RECEIVED% %BYTES_SENT% %DURATION% %RESP(X-ENVOY-UPSTREAM-SERVICE-TIME)% \"%REQ(X-FORWARDED-FOR)%\" \"%REQ(USER-AGENT)%\" \"%REQ(X-REQUEST-ID)%\" \"%REQ(:AUTHORITY)%\" \"%UPSTREAM_HOST%\" %UPSTREAM_CLUSTER% %UPSTREAM_LOCAL_ADDRESS% %DOWNSTREAM_LOCAL_ADDRESS% %DOWNSTREAM_REMOTE_ADDRESS% %REQUESTED_SERVER_NAME% %ROUTE_NAME%\n"
+```
+### From IstioOperator
+Chaning to JSON and changing the output format (not required):
+
+```
+spec:
+  meshConfig:
+    accessLogFile: /dev/stdout
+    accessLogEncoding: JSON
+    accessLogFormat: |
+      {
+        "protocol": "%PROTOCOL%",
+        "upstream_service_time": "%REQ(x-envoy-upstream-service-time)%",
+        "upstream_local_address": "%UPSTREAM_LOCAL_ADDRESS%",
+        "duration": "%DURATION%",
+        "upstream_transport_failure_reason": "%UPSTREAM_TRANSPORT_FAILURE_REASON%",
+        "route_name": "%ROUTE_NAME%",
+        "downstream_local_address": "%DOWNSTREAM_LOCAL_ADDRESS%",
+        "user_agent": "%REQ(USER-AGENT)%",
+        "response_code": "%RESPONSE_CODE%",
+        "response_flags": "%RESPONSE_FLAGS%",
+        "start_time": "%START_TIME%",
+        "method": "%REQ(:METHOD)%",
+        "request_id": "%REQ(X-REQUEST-ID)%",
+        "upstream_host": "%UPSTREAM_HOST%",
+        "x_forwarded_for": "%REQ(X-FORWARDED-FOR)%",
+        "client_ip": "%REQ(True-Client-Ip)%",
+        "requested_server_name": "%REQUESTED_SERVER_NAME%",
+        "bytes_received": "%BYTES_RECEIVED%",
+        "bytes_sent": "%BYTES_SENT%",
+        "upstream_cluster": "%UPSTREAM_CLUSTER%",
+        "downstream_remote_address": "%DOWNSTREAM_REMOTE_ADDRESS%",
+        "authority": "%REQ(:AUTHORITY)%",
+        "path": "%REQ(X-ENVOY-ORIGINAL-PATH?:PATH)%",
+        "response_code_details": "%RESPONSE_CODE_DETAILS%"
+      }
 ```
 
 # Custom Metrics
