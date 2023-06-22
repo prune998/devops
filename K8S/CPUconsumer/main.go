@@ -16,8 +16,9 @@ var (
 	version        = "no version set"
 	displayVersion = flag.Bool("version", false, "Show version and quit")
 	logLevel       = flag.String("logLevel", "warn", "log level from debug, info, warning, error. When debug, genetate 100% Tracing")
-	numCPU         = flag.Float64("numCPU", 0, "how many CPU to use (override GOMAXPROCS)")
-	waitDuration   = flag.Duration("waitDuration", time.Duration(30)*time.Second, "how long to wait between work, in Golang Duration")
+	waitCPU        = flag.Float64("waitCPU", 0, "how many CPU to use in the wait phase(override GOMAXPROCS)")
+	workCPU        = flag.Float64("workCPU", 0, "how many CPU to use in the work phase(override GOMAXPROCS)")
+	waitDuration   = flag.Duration("waitDuration", time.Duration(30)*time.Second, "how long to wait before work, in Golang Duration")
 	workDuration   = flag.Duration("workDuration", time.Duration(10)*time.Second, "how long to work, then wait, in Golang Duration")
 )
 
@@ -35,27 +36,17 @@ func main() {
 		os.Exit(0)
 	}
 
-	// Set the number of full CPU
-	n := int(*numCPU)
-
-	// CPU mili cores
-	m := math.Mod(*numCPU, 1)
-
-	// total number of routines to start
-	t := int(*numCPU)
-
-	// if not set, use all the CPUs as discovered by the system
-	if n == 0 && m == 0 {
-		n = runtime.NumCPU()
-		t = n
-	} else if m == 0 {
-		// if CPU is round, set GOMAXPROCS to the number of full CPU
-		t = n
-	} else {
-		t = n + 1
+	if *workCPU < *waitCPU {
+		fmt.Println("workCPU must be higher than waitCPU")
+		os.Exit(256)
 	}
 
+	// values for the working period
+	n, m, t := setCPU(*workCPU)
 	runtime.GOMAXPROCS(t)
+
+	// values for the waiting period
+	a, s, v := setCPU(*waitCPU)
 
 	// quit channel is used to force exit of all threads
 	quit := make(chan bool, t)
@@ -75,15 +66,26 @@ func main() {
 		fmt.Printf("starting %d+%.3f threads\n", n, m)
 		work(n, m, quit)
 
-		fmt.Printf("waiting for %s\n", *workDuration)
+		fmt.Printf("working for %s\n", *workDuration)
 		time.Sleep(*workDuration)
 
 		for i := 0; i < t; i++ {
 			quit <- true
 		}
 
-		fmt.Printf("Job done, sleeping for %s\n", *waitDuration)
-		time.Sleep(*waitDuration)
+		fmt.Printf("Job done, starting %d+%.3f waiting threads for %s\n", a, s, *waitDuration)
+
+		if *waitCPU > 0 {
+			work(a, s, quit)
+
+			time.Sleep(*waitDuration)
+
+			for i := 0; i < v; i++ {
+				quit <- true
+			}
+		} else {
+			time.Sleep(*waitDuration)
+		}
 	}
 }
 
@@ -136,4 +138,28 @@ func work(n int, m float64, quit <-chan bool) {
 			}
 		}()
 	}
+}
+
+// setCPU split the number of milicores into full cores + subsides
+func setCPU(c float64) (n int, m float64, t int) {
+	// Set the number of full CPU
+	n = int(c)
+
+	// CPU mili cores
+	m = math.Mod(c, 1)
+
+	// total number of routines to start
+	t = int(c)
+
+	// if not set, use all the CPUs as discovered by the system
+	if n == 0 && m == 0 {
+		n = runtime.NumCPU()
+		t = n
+	} else if m == 0 {
+		// if CPU is round, set GOMAXPROCS to the number of full CPU
+		t = n
+	} else {
+		t = n + 1
+	}
+	return n, m, t
 }

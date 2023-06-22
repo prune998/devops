@@ -9,9 +9,11 @@ This is a shitty program that is supposed to use some amount of CPU...
 
 Usage of ./CPUconsumer:
   -logLevel="warn": log level from debug, info, warning, error. When debug, genetate 100% Tracing
-  -numCPU=0: how many CPU to use (override GOMAXPROCS)
-  -testDuration=1m40s: how long to run the test, in Golang Duration
   -version=false: Show version and quit
+  -waitCPU=0: how many CPU to use in the wait phase(override GOMAXPROCS)
+  -waitDuration=30s: how long to wait before work, in Golang Duration
+  -workCPU=0: how many CPU to use in the work phase(override GOMAXPROCS)
+  -workDuration=10s: how long to work, then wait, in Golang Duration
 ```
 
 `numCPU` option is used to tell how many CPU to "consume".
@@ -20,13 +22,19 @@ This is achieved by:
 - running a `for{}` loop per full CPU count
 - running one more loop with a `sleep` delay equal to the fraction of the CPU
 
-So `-numCPU=1` should consume one CPU, `-numCPU=0.5` should consume 0.5 and `-numCPU=0` should whatever is available on your computer.
+So `-numCPU=1` should consume one CPU, `-numCPU=0.5` should consume 0.5 and `-numCPU=0` should consume whatever is available on your computer.
 
 ```warning
 There is no guarantee that this program will behave as intended. It will consume CPU, for sure, but rely on really basic things that may be different depending on the OS, version and so on.
 
 It has been proven to work well in Kubernetes (GKE), so far.
 ```
+
+## working and waiting
+
+You can set the number of CPU to consume during the `work` and the `wait` phase using `-workCPU` or `-waitCPU`. This will mimmick a more realistic burst workload where you
+still use some CPU when mostly nothing is happening.
+
 
 ## Build
 
