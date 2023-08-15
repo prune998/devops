@@ -23,3 +23,29 @@ cat /tmp/secret | base64 -D | gcloud secrets versions add <secret name> --projec
 # view secret
 gcloud secrets versions access latest --secret=<secret name> --project=<gcloud project>
 ```
+
+## Workload Identity
+
+- create a Pod with `gcloud` commands, and use the KSA that is supposed to have Workload Identity enabled
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: workload-identity-test
+  namespace: NAMESPACE
+spec:
+  containers:
+  - image: google/cloud-sdk:slim
+    name: workload-identity-test
+    command: ["sleep","infinity"]
+  serviceAccountName: KSA_NAME
+  nodeSelector:
+    iam.gke.io/gke-metadata-server-enabled: "true"
+```
+
+- Exec into this pod and run a curl command to the metadata server
+
+```bash
+curl -H "Metadata-Flavor: Google" http://169.254.169.254/computeMetadata/v1/instance/service-accounts/default/email
+```
