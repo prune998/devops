@@ -37,7 +37,8 @@ func init() {
 func HelloHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// Set the Kubernetes cluster where metrics are pushed to
-	pushUrl := "<pushgateway-url>:4278"
+	// pushUrl := "<pushgateway-url>:4278"
+	pushUrl := "http://gravel-gateway.<cluster-dns-name>:4278"
 	// Set the Kubernetes namespace the alerting rules are sent to.
 	kubernetesNamespace := "prune"
 	// Mandatory metric `job` label. Use the service name
@@ -49,7 +50,7 @@ func HelloHTTP(w http.ResponseWriter, r *http.Request) {
 	messagesTotal := prometheus.NewCounterVec(prometheus.CounterOpts{
 		Namespace: metricPrefix,
 		Name:      "messages_total",
-	}, []string{"type"})
+	}, []string{"type", "clearmode"})
 
 	// manage the HTTP request
 	var d struct {
@@ -68,6 +69,7 @@ func HelloHTTP(w http.ResponseWriter, r *http.Request) {
 		Format(expfmt.FmtText).
 		Grouping("namespace", kubernetesNamespace).
 		Collector(messagesTotal).
+		// Gatherer(prometheus.DefaultGatherer).
 		Add()
 	if err != nil {
 		fmt.Println(err)
@@ -82,7 +84,7 @@ func HelloHTTP(w http.ResponseWriter, r *http.Request) {
 
 func handleMessage(messagesTotal *prometheus.CounterVec, val int) {
 	// ...
-	messagesTotal.With(prometheus.Labels{"type": "test"}).Add(float64(val))
+	messagesTotal.With(prometheus.Labels{"type": "test", "clearmode": "family"}).Add(float64(val))
 }
 
 // [END functions_helloworld_http]
