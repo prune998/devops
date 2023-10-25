@@ -1,0 +1,17 @@
+go 1.21.1
+
+use (
+	./CLOUD/GCP/bigquery-reader
+	./CLOUD/GCP/gcs-downloader
+	./CLOUD/GCP/go-api-compute
+	./CLOUD/GCP/go-cloud-function
+	./CLOUD/GCP/gsm-editor
+	./CLOUD/GCP/pubsub-tester
+	./CLOUD/GCP/stackdriver-monitoring
+	./JSON/dasel-tool
+	./K8S/CPUconsumer
+	./K8S/go-k8s-client
+	./K8S/resource-dump-all
+	./WEB/droppingServer
+	./WEB/goThreadTester
+)

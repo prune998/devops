@@ -1,0 +1,14 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  labels:
+    app: cpuconsumer
+  name: cpuconsumer
+spec:
+  podMetricsEndpoints:
+  - port: http
+    path: /metrics
+    interval: 15s
+  selector:
+    matchLabels:
+      app: cpuconsumer

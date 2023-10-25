@@ -46,8 +46,8 @@ go build
 ## Docker image build
 
 ```bash
-docker  build -t prune/cpuconsumer:v0.0.1 --build-arg VERSION=0.0.1 .
-docker push prune/cpuconsumer:v0.0.1
+docker  build -t prune/cpuconsumer:v0.0.2 --build-arg VERSION=0.0.2 .
+docker push prune/cpuconsumer:v0.0.2
 ```
 
 ## Docs

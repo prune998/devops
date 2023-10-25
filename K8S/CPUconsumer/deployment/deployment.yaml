@@ -5,6 +5,7 @@ metadata:
     app: cpuconsumer
     project: cpuconsumer
     version: v1
+    app.kubernetes.io/name: cpuconsumer
   name: cpuconsumer
 spec:
   replicas: 1
@@ -27,19 +28,20 @@ spec:
     spec:
       containers:
       - name: cpuconsumer
-        image: prune/cpuconsumer:v0.0.1
+        image: prune/cpuconsumer:v0.0.2
         imagePullPolicy: Always
         env:
-          - name: "NUMCPU"
-            value: "1"
-          - name: "TESTDURATION"
-            value: "10m"
+          - name: "WAITCPU"
+            value: "1.5"
+          - name: "WORKCPU"
+            value: "2"
+          - name: "WAITDURATION"
+            value: "5m"
+          - name: "WORKDURATION"
+            value: "5m"
         ports:
-        - containerPort: 8080
+        - containerPort: 7789
           name: http
-          protocol: TCP
-        - containerPort: 8443
-          name: https
           protocol: TCP
         resources:
           limits:
@@ -48,3 +50,9 @@ spec:
           requests:
             cpu: 1
             memory: 100Mi
+      nodeSelector:
+        node.kubernetes.io/instance-type: n2d-highmem-4
+      tolerations:
+      - key: "dedicated"
+        value: "infra-ops"
+        effect: "NoSchedule"
