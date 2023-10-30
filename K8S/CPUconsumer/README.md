@@ -8,6 +8,8 @@ This is a shitty program that is supposed to use some amount of CPU...
 ./CPUconsumer -h
 
 Usage of ./CPUconsumer:
+  -debug=false: display debugs
+  -httpport="7789": port to bind for HTTP server used for Health and Metrics
   -logLevel="warn": log level from debug, info, warning, error. When debug, genetate 100% Tracing
   -version=false: Show version and quit
   -waitCPU=0: how many CPU to use in the wait phase(override GOMAXPROCS)

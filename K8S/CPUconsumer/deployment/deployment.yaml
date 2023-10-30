@@ -39,8 +39,8 @@ spec:
             value: "5m"
           - name: "WORKDURATION"
             value: "5m"
-          - name: "GOMAXPROCS"
-            value: "2"
+          # - name: "GOMAXPROCS"
+          #   value: "2"
         ports:
         - containerPort: 7789
           name: http
