@@ -32,23 +32,25 @@ spec:
         imagePullPolicy: Always
         env:
           - name: "WAITCPU"
-            value: "1.5"
+            value: "0.1"
           - name: "WORKCPU"
             value: "2"
           - name: "WAITDURATION"
             value: "5m"
           - name: "WORKDURATION"
             value: "5m"
+          - name: "GOMAXPROCS"
+            value: "2"
         ports:
         - containerPort: 7789
           name: http
           protocol: TCP
         resources:
           limits:
-            cpu: 2
+            cpu: 1
             memory: 100Mi
           requests:
-            cpu: 1
+            cpu: 100m
             memory: 100Mi
       nodeSelector:
         node.kubernetes.io/instance-type: n2d-highmem-4
