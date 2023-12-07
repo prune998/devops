@@ -1,4 +1,4 @@
-go 1.21.1
+go 1.21.4
 
 use (
 	./CLOUD/GCP/bigquery-reader
@@ -14,4 +14,5 @@ use (
 	./K8S/resource-dump-all
 	./WEB/droppingServer
 	./WEB/goThreadTester
+	./WEB/sentryTest
 )

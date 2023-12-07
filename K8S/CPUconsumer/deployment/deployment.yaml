@@ -34,20 +34,20 @@ spec:
           - name: "WAITCPU"
             value: "0.1"
           - name: "WORKCPU"
-            value: "2"
+            value: "3"
           - name: "WAITDURATION"
             value: "5m"
           - name: "WORKDURATION"
             value: "5m"
           # - name: "GOMAXPROCS"
-          #   value: "2"
+          #   value: "1"
         ports:
         - containerPort: 7789
           name: http
           protocol: TCP
         resources:
           limits:
-            cpu: 1
+            cpu: "1.5"
             memory: 100Mi
           requests:
             cpu: 100m
