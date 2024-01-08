@@ -38,7 +38,7 @@ func HelloHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// Set the Kubernetes cluster where metrics are pushed to
 	// pushUrl := "<pushgateway-url>:4278"
-	pushUrl := "http://gravel-gateway.<cluster-dns-name>:4278"
+	pushUrl := "http://gravel-gateway.wk-qa-us-central-cluster.qa.wk.internal:4278"
 	// Set the Kubernetes namespace the alerting rules are sent to.
 	kubernetesNamespace := "prune"
 	// Mandatory metric `job` label. Use the service name
