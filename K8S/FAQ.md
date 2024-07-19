@@ -15,6 +15,18 @@ apt update
 apt install vim wget curl dnsutils
 ```
 
+## Debug port-forward
+
+```bash
+kubectl run tcpecho --image=alpine --restart=Never -- /bin/sh -c "apk add socat && socat -v tcp-listen:8080,fork EXEC:cat"
+# with Istio injected
+#  kubectl run tcpecho --image=alpine --restart=Never --labels="sidecar.istio.io/inject=true" -- /bin/sh -c "apk add socat && socat -v tcp-listen:8080,fork EXEC:cat"
+kubectl port-forward pod/tcpecho 8080
+
+# connect in another shell
+nc -v localhost 8080
+```
+
 # Search things
 
 ## Find resources with Finalizers
@@ -40,6 +52,14 @@ This is useful to find a pod when you know the UID as found in the filesystem of
 
 ```bash
 k --context gke_bx-production-ops_us-east4_prod-ops-cluster get pods -n ops -o custom-columns=PodName:.metadata.name,PodUID:.metadata.uid
+```
+
+# StatefulSets
+
+##  Delete a STS but keep the pods
+
+```shell
+kubectl delete sts --cascade=orpha <sts name>
 ```
 
 # Istio
@@ -401,4 +421,21 @@ This is a really slow operation as it will `k get` on every resource...
 ```bash
 NAMESPACE="prune"
 kubectl api-resources --verbs=list --namespaced -o name | xargs -n 1 kubectl get --show-kind --ignore-not-found -n ${NAMESPACE}
+```
+# GKE debug
+
+## check pod settings from the node
+
+### list Conntrack
+
+```bash
+sudo conntrack -L
+```
+
+### Run command in a pod
+
+```bash
+crictl ps
+crictl inspect <container ID>
+nsenter -t <PID> -n netstat
 ```

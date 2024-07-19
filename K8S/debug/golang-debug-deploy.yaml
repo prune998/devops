@@ -4,7 +4,7 @@ metadata:
   labels:
     app: golang-debug
   name: golang-debug
-  # namespace: prune
+  namespace: prune
 spec:
   progressDeadlineSeconds: 60
   replicas: 1
@@ -22,7 +22,7 @@ spec:
       creationTimestamp: null
       labels:
         app: golang-debug
-        sidecar.istio.io/inject: "false"
+        sidecar.istio.io/inject: "true"
     spec:
       containers:
       - command:
