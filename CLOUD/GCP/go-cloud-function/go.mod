@@ -1,11 +1,11 @@
 module github.com/prune998/devops/CLOUD/GCP/go-cloud-function
 
-go 1.21
+go 1.23.2
 
 require (
-	github.com/GoogleCloudPlatform/functions-framework-go v1.8.1
-	github.com/prometheus/client_golang v1.19.1
-	github.com/prometheus/common v0.55.0
+	github.com/GoogleCloudPlatform/functions-framework-go v1.9.0
+	github.com/prometheus/client_golang v1.20.5
+	github.com/prometheus/common v0.60.0
 )
 
 require (
@@ -25,6 +25,6 @@ require (
 	go.uber.org/atomic v1.11.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.27.0 // indirect
-	golang.org/x/sys v0.22.0 // indirect
-	google.golang.org/protobuf v1.34.2 // indirect
+	golang.org/x/sys v0.26.0 // indirect
+	google.golang.org/protobuf v1.35.1 // indirect
 )

@@ -36,7 +36,7 @@ func main() {
 	default:
 		slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelInfo})))
 	}
-	slog.SetDefault(slog.With("app", "opslevel-run-subcommand"))
+	slog.SetDefault(slog.With("app", "go-gitlab-tools"))
 
 	accessToken := os.Getenv(*tokenVAR)
 	glClient, _ := gitlab.NewClient(accessToken, gitlab.WithBaseURL(*gitlabURL))
