@@ -1,6 +1,7 @@
-go 1.22.2
+go 1.23.1
 
 use (
+	./CICD/go-gitlab-tools
 	./CLOUD/GCP/bigquery-reader
 	./CLOUD/GCP/gcs-downloader
 	./CLOUD/GCP/go-api-compute
@@ -12,7 +13,6 @@ use (
 	./K8S/CPUconsumer
 	./K8S/go-k8s-client
 	./K8S/resource-dump-all
-	./OTHER/go-gitlab
 	./WEB/droppingServer
 	./WEB/goThreadTester
 	./WEB/sentryTest
