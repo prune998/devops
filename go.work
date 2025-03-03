@@ -1,6 +1,8 @@
-go 1.23.2
+go 1.23.5
 
 use (
+	./CICD/find-gitlab-files
+	./CICD/go-gitlab-list-repos
 	./CICD/go-gitlab-tools
 	./CLOUD/GCP/bigquery-reader
 	./CLOUD/GCP/gcs-downloader
@@ -9,6 +11,8 @@ use (
 	./CLOUD/GCP/gsm-editor
 	./CLOUD/GCP/pubsub-tester
 	./CLOUD/GCP/stackdriver-monitoring
+	./GITHUB/go-git-app-auth-test
+	./GITHUB/go-github-app-auth-test
 	./JSON/dasel-tool
 	./K8S/CPUconsumer
 	./K8S/go-k8s-client

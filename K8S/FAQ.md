@@ -102,6 +102,9 @@ metadata:
   name: enable-accesslog
   namespace: <yournamespace>
 spec:
+  workloadSelector:
+    labels:
+      istio: ingressgateway
   configPatches:
   - applyTo: NETWORK_FILTER
     match:

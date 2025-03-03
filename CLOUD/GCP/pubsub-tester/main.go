@@ -25,11 +25,25 @@ func main() {
 		os.Exit(1)
 	}
 
-	ctx := context.Background()
+	creds := os.Getenv("CREDENTIALS")
+	if creds == "" {
+		fmt.Println("CREDENTIALS environment variable not set, using Worload Identity.")
+	}
 
-	client, err := pubsub.NewClient(ctx, projectID, option.WithCredentialsFile("/tmp/sa_credentials.json"))
-	if err != nil {
-		log.Fatal(err)
+	ctx := context.Background()
+	var client *pubsub.Client
+	var err error
+	if creds != "" {
+		client, err = pubsub.NewClient(ctx, projectID, option.WithCredentialsFile("/tmp/sa_credentials.json"))
+		if err != nil {
+			log.Fatal(err)
+		}
+	} else {
+
+		client, err = pubsub.NewClient(ctx, projectID)
+		if err != nil {
+			log.Fatal(err)
+		}
 	}
 	defer client.Close()
 

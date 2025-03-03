@@ -5,20 +5,26 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"math/rand"
 	"os"
+	pathpkg "path"
 	"strings"
 
-	"github.com/xanzy/go-gitlab"
+	gitlab "gitlab.com/gitlab-org/api/client-go"
 )
 
 var (
 	tokenVAR       = flag.String("token", "GITLAB_TOKEN", "env var used to store token")
 	gitlabURL      = flag.String("url", "", "URL to the gitlab server API (down to v4)")
-	project        = flag.String("project", "", "project name (full path, ex: 'my/gitbal/project')")
+	project        = flag.String("project", "", "project name (project name with namespace, ex: 'my/gitbal/project')")
 	folderListPath = flag.String("folder", "", "path to the folder to list")
 	file           = flag.String("file", "", "full path to file to download. ex: 'my/file.txt')")
 	branch         = flag.String("branch", "default", "branch used to lookup file, use default if you don't know')")
 	logLevel       = flag.String("logLevel", "info", "one of trace, debug, info, warn, err, none")
+
+	updateTopic = flag.Bool("updateTopic", false, "set to true to add a new topic")
+
+	letters = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
 )
 
 func main() {
@@ -49,24 +55,80 @@ func main() {
 		os.Exit(1)
 	}
 
-	slog.Info("Project found", "project", gitProjects)
+	slog.Debug("Project found", "project", gitProjects)
 
 	if *branch == "default" {
 		*branch = gitProjects.DefaultBranch
 	}
-	// get file list
-	glo := &gitlab.ListTreeOptions{
-		Path:      folderListPath,
-		Ref:       branch,
-		Recursive: gitlab.Ptr(true),
+
+	// list topics
+	slog.Info("topics found", "topics", gitProjects.Topics)
+
+	// add a topic
+	if *updateTopic {
+		editOpts := &gitlab.EditProjectOptions{
+			Topics: gitlab.Ptr(append(gitProjects.Topics, fmt.Sprintf("github:my-new-topic-%s", randSeq(4)))),
+		}
+		gitProjects, _, err = glClient.Projects.EditProject(gitProjects.ID, editOpts)
+		if err != nil {
+			slog.Error("error updating the Topics", "error", err)
+		}
 	}
 
-	files, _, err := glClient.Repositories.ListTree(gitProjects.ID, glo)
-	if err != nil {
-		slog.Error("error looking up project tree", "project", gitProjects.ID, "root", *folderListPath, "branch", *branch, "err", err)
-		os.Exit(1)
+	// get file list
+	directories := []string{
+		*folderListPath,
+		pathpkg.Dir(*folderListPath),
 	}
-	slog.Info("Repo Tree found", "root", *folderListPath, "branch", *branch, "list", files)
+
+	done := 0
+	for _, directory := range directories {
+		if done > 0 {
+			break
+		}
+		fmt.Printf("searching for %s\n", directory)
+
+		glo := &gitlab.ListTreeOptions{
+			ListOptions: gitlab.ListOptions{PerPage: 2},
+			Path:        &directory,
+			Ref:         branch,
+			Recursive:   gitlab.Ptr(false),
+		}
+
+		nextPage := 0
+		for {
+			files, resp, err := glClient.Repositories.ListTree(gitProjects.ID, glo)
+			if err != nil {
+				slog.Error("error looking up project tree", "project", gitProjects.ID, "root", *folderListPath, "branch", *branch, "err", err)
+				os.Exit(1)
+			}
+			slog.Info("Repo Tree found", "root", *folderListPath, "branch", *branch, "directory", directory, "count", len(files), "page", nextPage, "TotalItems", resp.TotalItems)
+
+			if *folderListPath == directory {
+				if resp.TotalItems > 0 {
+					slog.Info("File found", "root", *folderListPath, "branch", *branch, "directory", directory, "files", files, "page", nextPage)
+					done = 1
+					break
+				}
+			}
+			for i := range files {
+				if files[i].Path == *folderListPath {
+					slog.Info("File found", "root", *folderListPath, "branch", *branch, "directory", directory, "files", files, "page", nextPage)
+					done = 1
+					break
+				}
+			}
+
+			nextPage++
+			if resp.NextPage == 0 {
+				// no future pages
+				break
+			}
+			glo.Page = resp.NextPage
+		}
+	}
+
+	os.Exit(0)
 
 	opts := &gitlab.GetFileOptions{Ref: branch}
 	// encodedFile := url.QueryEscape(fmt.Sprintf("%s", *file))
@@ -77,7 +139,7 @@ func main() {
 		slog.Error("error looking up PLAIN file", "file", encodedFile, "branch", *branch, "err", err)
 		os.Exit(1)
 	}
-	slog.Info("PLAIN File found found", "file", encodedFile, "branch", *branch, "length", f.Size)
+	slog.Debug("PLAIN File found found", "file", encodedFile, "branch", *branch, "length", f.Size)
 
 	// get raw file
 	rawTeamsData, _, err := glClient.RepositoryFiles.GetRawFile(gitProjects.ID, encodedFile, &gitlab.GetRawFileOptions{
@@ -87,5 +149,18 @@ func main() {
 		slog.Error("error looking up RAW file", "file", encodedFile, "branch", *branch, "err", err)
 		os.Exit(1)
 	}
-	slog.Info("RAW File found found", "file", encodedFile, "branch", *branch, "length", len(rawTeamsData))
+	slog.Debug("RAW File found found", "file", encodedFile, "branch", *branch, "length", len(rawTeamsData))
+
+}
+
+// func init() {
+// 	rand.Seed(time.Now().UnixNano())
+// }
+
+func randSeq(n int) string {
+	b := make([]rune, n)
+	for i := range b {
+		b[i] = letters[rand.Intn(len(letters))]
+	}
+	return string(b)
 }
