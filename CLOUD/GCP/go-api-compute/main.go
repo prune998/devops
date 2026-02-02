@@ -9,6 +9,7 @@ import (
 
 	"github.com/namsral/flag"
 	"google.golang.org/api/compute/v1"
+	"google.golang.org/api/identitytoolkit/v1"
 )
 
 var (
@@ -31,6 +32,19 @@ func main() {
 	// 	compute.DevstorageFullControlScope,
 	// 	compute.ComputeScope,
 	// }
+
+	ctx2 := context.Background()
+	service2, err := identitytoolkit.NewService(ctx2)
+	if err != nil {
+		logger.Log("msg", "error listing images", "err", err)
+		os.Exit(1)
+	}
+
+	response, err := service2.Projects.Projects.ServiceAccounts.List("projects/" + projectID).Do()
+	if err != nil {
+		logger.Log("msg", "error listing images", "err", err)
+		os.Exit(1)
+	}
 
 	// var client *http.Client
 	ctx := context.Background()

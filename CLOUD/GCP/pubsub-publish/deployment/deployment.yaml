@@ -1,0 +1,47 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: pubsubpublish
+    project: pubsubpublish
+    version: v1
+    app.kubernetes.io/name: pubsubpublish
+  name: pubsubpublish
+  namespace: event-collector
+spec:
+  replicas: 1
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app: pubsubpublish
+      name: pubsubpublish
+      project: pubsubpublish
+      version: v1
+  template:
+    metadata:
+      annotations:
+        nosidecar.istio.io/inject: "false"
+      labels:
+        app: pubsubpublish
+        name: pubsubpublish
+        project: pubsubpublish
+        version: v1
+    spec:
+      containers:
+      - name: pubsubpublish
+        image: prune/pubsubpublish:v0.0.1
+        imagePullPolicy: Always
+        env:
+          - name: "GCP_PROJECT_ID"
+            value: "bx-test-project-1"
+          - name: "PUBSUB_TOPIC_ID"
+            value: "raw-events"
+        resources:
+          limits:
+            cpu: "1.5"
+            memory: 100Mi
+          requests:
+            cpu: 100m
+            memory: 100Mi
+      serviceAccount: event-collector
+      serviceAccountName: event-collector

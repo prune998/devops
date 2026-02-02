@@ -1,4 +1,4 @@
-# Gcloud 
+# Gcloud
 
 ## Cloud SQL (mysql)
 
@@ -50,4 +50,15 @@ spec:
 curl -H "Metadata-Flavor: Google" http://169.254.169.254/computeMetadata/v1/instance/service-accounts/default/email
 
 curl  -H "Metadata-Flavor: Google" 'http://169.254.169.254/computeMetadata/v1/instance/service-accounts/<previous email>/email'
+```
+
+- Add more tooling
+
+```bash
+apt update
+cd
+wget https://dl.google.com/go/go1.24.1.linux-amd64.tar.gz
+rm -rf /usr/local/go && tar -C /usr/local -xzf go1.24.1.linux-amd64.tar.gz
+export PATH=$PATH:/usr/local/go/bin
+go version
 ```

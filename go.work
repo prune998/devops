@@ -1,18 +1,21 @@
-go 1.23.5
+go 1.25.5
 
 use (
 	./CICD/find-gitlab-files
 	./CICD/go-gitlab-list-repos
 	./CICD/go-gitlab-tools
 	./CLOUD/GCP/bigquery-reader
+	./CLOUD/GCP/firestore-tester
 	./CLOUD/GCP/gcs-downloader
 	./CLOUD/GCP/go-api-compute
 	./CLOUD/GCP/go-cloud-function
 	./CLOUD/GCP/gsm-editor
 	./CLOUD/GCP/pubsub-tester
+	./CLOUD/GCP/pubsub-publish
 	./CLOUD/GCP/stackdriver-monitoring
 	./GITHUB/go-git-app-auth-test
 	./GITHUB/go-github-app-auth-test
+	./GOLANG/boilerplate
 	./JSON/dasel-tool
 	./K8S/CPUconsumer
 	./K8S/go-k8s-client
