@@ -1,0 +1,8 @@
+{{/*
+Dump a variable for debugging purposes.
+Usage: {{ include "chart.var_dump" .Values.someVar }}
+*/}}
+{{- define "chart.var_dump" -}}
+{{-  := printf "DEBUG DUMP: %s" (. | mustToPrettyJson) -}}
+{{- fail  -}}
+{{- end -}}
