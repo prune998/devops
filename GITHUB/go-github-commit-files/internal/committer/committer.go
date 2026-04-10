@@ -41,6 +41,10 @@ func New(client *github.Client, owner, repo, branch string, maxRetries int) *Com
 // CommitFiles atomically commits all files in a single Git commit.
 // Returns the new commit SHA on success.
 func (c *Committer) CommitFiles(ctx context.Context, files []FilePair) (string, error) {
+	if len(files) == 0 {
+		return "", fmt.Errorf("CommitFiles: files slice must not be empty")
+	}
+
 	// Step 1: resolve branch HEAD to a commit SHA
 	slog.Info("fetching branch ref",
 		"owner", c.owner, "repo", c.repo, "branch", c.branch)
@@ -50,6 +54,7 @@ func (c *Committer) CommitFiles(ctx context.Context, files []FilePair) (string, 
 		ref, _, err = c.client.Git.GetRef(ctx, c.owner, c.repo, "refs/heads/"+c.branch)
 		return err
 	}); err != nil {
+		slog.Error("failed to get branch ref", "branch", c.branch, "error", err)
 		return "", fmt.Errorf("getting branch ref refs/heads/%s: %w", c.branch, err)
 	}
 	commitSHA := ref.GetObject().GetSHA()
@@ -63,6 +68,7 @@ func (c *Committer) CommitFiles(ctx context.Context, files []FilePair) (string, 
 		baseCommit, _, err = c.client.Git.GetCommit(ctx, c.owner, c.repo, commitSHA)
 		return err
 	}); err != nil {
+		slog.Error("failed to get base commit", "commit_sha", commitSHA, "error", err)
 		return "", fmt.Errorf("getting commit %s: %w", commitSHA, err)
 	}
 	treeSHA := baseCommit.GetTree().GetSHA()
@@ -74,6 +80,7 @@ func (c *Committer) CommitFiles(ctx context.Context, files []FilePair) (string, 
 		slog.Info("reading local file", "src", fp.Src, "dest", fp.Dest)
 		content, err := os.ReadFile(fp.Src)
 		if err != nil {
+			slog.Error("failed to read local file", "src", fp.Src, "error", err)
 			return "", fmt.Errorf("reading file %s: %w", fp.Src, err)
 		}
 
@@ -88,6 +95,7 @@ func (c *Committer) CommitFiles(ctx context.Context, files []FilePair) (string, 
 			})
 			return err
 		}); err != nil {
+			slog.Error("failed to create blob", "dest", fp.Dest, "error", err)
 			return "", fmt.Errorf("creating blob for %s: %w", fp.Dest, err)
 		}
 		slog.Info("blob created", "dest", fp.Dest, "sha", blob.GetSHA())
@@ -96,7 +104,7 @@ func (c *Committer) CommitFiles(ctx context.Context, files []FilePair) (string, 
 			Path: github.Ptr(fp.Dest),
 			Mode: github.Ptr("100644"),
 			Type: github.Ptr("blob"),
-			SHA:  blob.SHA,
+			SHA:  github.Ptr(blob.GetSHA()),
 		})
 	}
 
@@ -108,6 +116,7 @@ func (c *Committer) CommitFiles(ctx context.Context, files []FilePair) (string, 
 		newTree, _, err = c.client.Git.CreateTree(ctx, c.owner, c.repo, treeSHA, treeEntries)
 		return err
 	}); err != nil {
+		slog.Error("failed to create tree", "error", err)
 		return "", fmt.Errorf("creating tree: %w", err)
 	}
 	slog.Info("tree created", "sha", newTree.GetSHA())
@@ -126,11 +135,12 @@ func (c *Committer) CommitFiles(ctx context.Context, files []FilePair) (string, 
 		var err error
 		newCommit, _, err = c.client.Git.CreateCommit(ctx, c.owner, c.repo, &github.Commit{
 			Message: github.Ptr(message),
-			Tree:    &github.Tree{SHA: newTree.SHA},
+			Tree:    &github.Tree{SHA: github.Ptr(newTree.GetSHA())},
 			Parents: []*github.Commit{{SHA: github.Ptr(commitSHA)}},
 		}, &github.CreateCommitOptions{})
 		return err
 	}); err != nil {
+		slog.Error("failed to create commit", "error", err)
 		return "", fmt.Errorf("creating commit: %w", err)
 	}
 	slog.Info("commit created", "sha", newCommit.GetSHA(), "message", message)
@@ -144,6 +154,7 @@ func (c *Committer) CommitFiles(ctx context.Context, files []FilePair) (string, 
 		}, false)
 		return err
 	}); err != nil {
+		slog.Error("failed to update branch ref", "branch", c.branch, "error", err)
 		return "", fmt.Errorf("updating branch ref: %w", err)
 	}
 
