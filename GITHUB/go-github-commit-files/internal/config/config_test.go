@@ -56,7 +56,7 @@ func TestParseFrom_missingFiles(t *testing.T) {
 	}
 	_, err := ParseFrom(args, func(string) string { return "" })
 	if err == nil {
-		t.Fatal("expected error for missing --file, got nil")
+		t.Fatal("expected error when neither --file nor --delete-file is provided, got nil")
 	}
 }
 
@@ -140,6 +140,12 @@ func TestParseFrom_deleteFile(t *testing.T) {
 	}
 	if cfg.DeleteFiles[1] != "another/old.yaml" {
 		t.Errorf("want DeleteFiles[1]=another/old.yaml, got %q", cfg.DeleteFiles[1])
+	}
+	if len(cfg.Files) != 1 {
+		t.Errorf("want 1 upload file, got %d", len(cfg.Files))
+	}
+	if len(cfg.Files) == 1 && cfg.Files[0].Src != "./a.yaml" {
+		t.Errorf("want Files[0].Src=./a.yaml, got %q", cfg.Files[0].Src)
 	}
 }
 

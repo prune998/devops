@@ -101,7 +101,12 @@ func ParseFrom(args []string, getenv func(string) string) (*Config, error) {
 		cfg.Files = append(cfg.Files, pair)
 	}
 
-	cfg.DeleteFiles = []string(deleteFiles)
+	for _, f := range deleteFiles {
+		if f == "" {
+			return nil, fmt.Errorf("--delete-file value must not be empty")
+		}
+		cfg.DeleteFiles = append(cfg.DeleteFiles, f)
+	}
 
 	required := []struct{ flag, value string }{
 		{"--app-id (GITHUB_APP_ID)", cfg.AppID},
