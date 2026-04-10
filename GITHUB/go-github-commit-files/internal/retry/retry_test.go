@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"net/url"
 	"os"
 	"testing"
 	"time"
@@ -95,6 +96,10 @@ func TestDo_rateLimitErrorRetried(t *testing.T) {
 			return &github.RateLimitError{
 				Rate:    github.Rate{Reset: pastReset},
 				Message: "rate limit exceeded",
+				Response: &http.Response{
+					StatusCode: 403,
+					Request:    &http.Request{Method: "GET", URL: &url.URL{Path: "/repos"}},
+				},
 			}
 		}
 		return nil

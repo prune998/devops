@@ -57,7 +57,7 @@ func Do(ctx context.Context, maxAttempts int, operation string, fn func() error)
 			"attempt", attempt,
 			"max_attempts", maxAttempts,
 			"wait_duration", waitDur.String(),
-			"error", err,
+			"error", safeErrMsg(err),
 		)
 
 		select {
@@ -113,4 +113,20 @@ func waitDuration(err error, attempt int) (time.Duration, bool) {
 	}
 
 	return 0, false
+}
+
+// safeErrMsg calls err.Error() safely, catching panics from upstream Error()
+// implementations that dereference nil fields (e.g. github.RateLimitError when
+// Response is nil from the pre-flight rate-limit check).
+func safeErrMsg(err error) string {
+	var msg string
+	func() {
+		defer func() {
+			if r := recover(); r != nil {
+				msg = fmt.Sprintf("(error message unavailable: %v)", r)
+			}
+		}()
+		msg = err.Error()
+	}()
+	return msg
 }
