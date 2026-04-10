@@ -23,6 +23,7 @@ type Config struct {
 	Repo           string
 	Branch         string
 	Files          []FilePair
+	DeleteFiles    []string
 	MaxRetries     int
 	LogLevel       string
 }
@@ -59,6 +60,7 @@ func ParseFrom(args []string, getenv func(string) string) (*Config, error) {
 	}
 
 	var files fileFlags
+	var deleteFiles fileFlags
 
 	appID := fs.String("app-id", envOr("GITHUB_APP_ID", ""), "GitHub App ID")
 	privateKey := fs.String("private-key", envOr("GITHUB_PRIVATE_KEY_PATH", ""), "Path to PEM private key file")
@@ -69,6 +71,7 @@ func ParseFrom(args []string, getenv func(string) string) (*Config, error) {
 	maxRetriesStr := fs.String("max-retries", envOr("MAX_RETRIES", "5"), "Max retries per API call, 0 = no retries (default 5)")
 	logLevel := fs.String("log-level", envOr("LOG_LEVEL", "info"), "Log level: debug/info/warn/error")
 	fs.Var(&files, "file", "Repeatable src:dest file pair (e.g. ./local.yaml:path/in/repo.yaml)")
+	fs.Var(&deleteFiles, "delete-file", "Repeatable repo path to delete (e.g. old/config.yaml)")
 
 	if err := fs.Parse(args); err != nil {
 		return nil, fmt.Errorf("parsing flags: %w", err)
@@ -98,6 +101,8 @@ func ParseFrom(args []string, getenv func(string) string) (*Config, error) {
 		cfg.Files = append(cfg.Files, pair)
 	}
 
+	cfg.DeleteFiles = []string(deleteFiles)
+
 	required := []struct{ flag, value string }{
 		{"--app-id (GITHUB_APP_ID)", cfg.AppID},
 		{"--private-key (GITHUB_PRIVATE_KEY_PATH)", cfg.PrivateKeyPath},
@@ -111,8 +116,8 @@ func ParseFrom(args []string, getenv func(string) string) (*Config, error) {
 			return nil, fmt.Errorf("required flag %s is not set", r.flag)
 		}
 	}
-	if len(cfg.Files) == 0 {
-		return nil, fmt.Errorf("at least one --file src:dest pair is required")
+	if len(cfg.Files) == 0 && len(cfg.DeleteFiles) == 0 {
+		return nil, fmt.Errorf("at least one --file or --delete-file is required")
 	}
 
 	return cfg, nil

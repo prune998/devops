@@ -115,3 +115,67 @@ func TestParseFrom_envVarFallback(t *testing.T) {
 		t.Errorf("want Owner from env=theorg, got %q", cfg.Owner)
 	}
 }
+
+func TestParseFrom_deleteFile(t *testing.T) {
+	args := []string{
+		"--app-id", "123",
+		"--private-key", "/tmp/key.pem",
+		"--installation-id", "456",
+		"--owner", "myorg",
+		"--repo", "myrepo",
+		"--branch", "main",
+		"--file", "./a.yaml:path/a.yaml",
+		"--delete-file", "old/file.yaml",
+		"--delete-file", "another/old.yaml",
+	}
+	cfg, err := ParseFrom(args, func(string) string { return "" })
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(cfg.DeleteFiles) != 2 {
+		t.Errorf("want 2 delete files, got %d", len(cfg.DeleteFiles))
+	}
+	if cfg.DeleteFiles[0] != "old/file.yaml" {
+		t.Errorf("want DeleteFiles[0]=old/file.yaml, got %q", cfg.DeleteFiles[0])
+	}
+	if cfg.DeleteFiles[1] != "another/old.yaml" {
+		t.Errorf("want DeleteFiles[1]=another/old.yaml, got %q", cfg.DeleteFiles[1])
+	}
+}
+
+func TestParseFrom_deleteFileOnly(t *testing.T) {
+	args := []string{
+		"--app-id", "123",
+		"--private-key", "/tmp/key.pem",
+		"--installation-id", "456",
+		"--owner", "myorg",
+		"--repo", "myrepo",
+		"--branch", "main",
+		"--delete-file", "old/file.yaml",
+	}
+	cfg, err := ParseFrom(args, func(string) string { return "" })
+	if err != nil {
+		t.Fatalf("expected delete-file-only to be valid, got error: %v", err)
+	}
+	if len(cfg.Files) != 0 {
+		t.Errorf("want 0 upload files, got %d", len(cfg.Files))
+	}
+	if len(cfg.DeleteFiles) != 1 {
+		t.Errorf("want 1 delete file, got %d", len(cfg.DeleteFiles))
+	}
+}
+
+func TestParseFrom_neitherFileNorDeleteFile(t *testing.T) {
+	args := []string{
+		"--app-id", "123",
+		"--private-key", "/tmp/key.pem",
+		"--installation-id", "456",
+		"--owner", "myorg",
+		"--repo", "myrepo",
+		"--branch", "main",
+	}
+	_, err := ParseFrom(args, func(string) string { return "" })
+	if err == nil {
+		t.Fatal("expected error when neither --file nor --delete-file is provided, got nil")
+	}
+}
