@@ -83,8 +83,8 @@ func (c *Committer) CommitFiles(ctx context.Context, files []FilePair) (string, 
 		if err := retry.Do(ctx, c.maxRetries, "create_blob:"+fp.Dest, func() error {
 			var err error
 			blob, _, err = c.client.Git.CreateBlob(ctx, c.owner, c.repo, &github.Blob{
-				Content:  github.String(encoded),
-				Encoding: github.String("base64"),
+				Content:  github.Ptr(encoded),
+				Encoding: github.Ptr("base64"),
 			})
 			return err
 		}); err != nil {
@@ -93,9 +93,9 @@ func (c *Committer) CommitFiles(ctx context.Context, files []FilePair) (string, 
 		slog.Info("blob created", "dest", fp.Dest, "sha", blob.GetSHA())
 
 		treeEntries = append(treeEntries, &github.TreeEntry{
-			Path: github.String(fp.Dest),
-			Mode: github.String("100644"),
-			Type: github.String("blob"),
+			Path: github.Ptr(fp.Dest),
+			Mode: github.Ptr("100644"),
+			Type: github.Ptr("blob"),
 			SHA:  blob.SHA,
 		})
 	}
@@ -125,9 +125,9 @@ func (c *Committer) CommitFiles(ctx context.Context, files []FilePair) (string, 
 	if err := retry.Do(ctx, c.maxRetries, "create_commit", func() error {
 		var err error
 		newCommit, _, err = c.client.Git.CreateCommit(ctx, c.owner, c.repo, &github.Commit{
-			Message: github.String(message),
+			Message: github.Ptr(message),
 			Tree:    &github.Tree{SHA: newTree.SHA},
-			Parents: []*github.Commit{{SHA: github.String(commitSHA)}},
+			Parents: []*github.Commit{{SHA: github.Ptr(commitSHA)}},
 		}, &github.CreateCommitOptions{})
 		return err
 	}); err != nil {
@@ -139,7 +139,7 @@ func (c *Committer) CommitFiles(ctx context.Context, files []FilePair) (string, 
 	slog.Info("updating branch ref", "branch", c.branch, "commit_sha", newCommit.GetSHA())
 	if err := retry.Do(ctx, c.maxRetries, "update_ref", func() error {
 		_, _, err := c.client.Git.UpdateRef(ctx, c.owner, c.repo, &github.Reference{
-			Ref:    github.String("refs/heads/" + c.branch),
+			Ref:    github.Ptr("refs/heads/" + c.branch),
 			Object: &github.GitObject{SHA: newCommit.SHA},
 		}, false)
 		return err
