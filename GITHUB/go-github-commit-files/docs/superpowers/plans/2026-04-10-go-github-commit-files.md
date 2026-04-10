@@ -6,7 +6,7 @@
 
 **Architecture:** Four focused packages under `internal/` — `config` (flag+env parsing), `githubapp` (auth), `retry` (retry wrapper), `committer` (Git Trees API logic) — wired by `main.go`. Each package has a single responsibility and is independently testable.
 
-**Tech Stack:** Go 1.23.5, `github.com/google/go-github/v69`, `github.com/beatlabs/github-auth`, stdlib `log/slog`, `flag`, `errors`, `math`, `encoding/base64`
+**Tech Stack:** Go 1.26, `github.com/google/go-github/v69`, `github.com/beatlabs/github-auth`, stdlib `log/slog`, `flag`, `errors`, `math`, `encoding/base64`
 
 ---
 
@@ -26,7 +26,7 @@
 ```
 module github.com/prune998/devops/GITHUB/go-github-commit-files
 
-go 1.23.5
+go 1.26
 
 require (
 	github.com/beatlabs/github-auth v0.0.0-20240915075323-ab38acb2d2a1
