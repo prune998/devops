@@ -39,10 +39,11 @@ func New(client *github.Client, owner, repo, branch string, maxRetries int) *Com
 }
 
 // CommitFiles atomically commits all files in a single Git commit.
+// files contains upload pairs; deleteFiles contains repo paths to remove.
 // Returns the new commit SHA on success.
-func (c *Committer) CommitFiles(ctx context.Context, files []FilePair) (string, error) {
-	if len(files) == 0 {
-		return "", fmt.Errorf("CommitFiles: files slice must not be empty")
+func (c *Committer) CommitFiles(ctx context.Context, files []FilePair, deleteFiles []string) (string, error) {
+	if len(files) == 0 && len(deleteFiles) == 0 {
+		return "", fmt.Errorf("CommitFiles: files and deleteFiles must not both be empty")
 	}
 
 	// Step 1: resolve branch HEAD to a commit SHA
@@ -108,6 +109,18 @@ func (c *Committer) CommitFiles(ctx context.Context, files []FilePair) (string, 
 		})
 	}
 
+	// Step 3b: add a nil-SHA tree entry for each file to delete.
+	// The Git Trees API interprets SHA=null as "remove this path from the tree".
+	for _, path := range deleteFiles {
+		slog.Info("queuing file for deletion", "path", path)
+		treeEntries = append(treeEntries, &github.TreeEntry{
+			Path: github.Ptr(path),
+			Mode: github.Ptr("100644"),
+			Type: github.Ptr("blob"),
+			SHA:  nil,
+		})
+	}
+
 	// Step 4: create a new tree from all blobs
 	slog.Info("creating tree", "base_tree_sha", treeSHA, "entry_count", len(treeEntries))
 	var newTree *github.Tree
@@ -121,12 +134,19 @@ func (c *Committer) CommitFiles(ctx context.Context, files []FilePair) (string, 
 	}
 	slog.Info("tree created", "sha", newTree.GetSHA())
 
-	// Step 5: build commit message from destination paths
-	destPaths := make([]string, len(files))
-	for i, fp := range files {
-		destPaths[i] = fp.Dest
+	// Step 5: build commit message
+	var msgParts []string
+	if len(files) > 0 {
+		destPaths := make([]string, len(files))
+		for i, fp := range files {
+			destPaths[i] = fp.Dest
+		}
+		msgParts = append(msgParts, "update "+strings.Join(destPaths, ", "))
 	}
-	message := "chore: update " + strings.Join(destPaths, ", ") + " via automation"
+	if len(deleteFiles) > 0 {
+		msgParts = append(msgParts, "delete "+strings.Join(deleteFiles, ", "))
+	}
+	message := "chore: " + strings.Join(msgParts, ", ") + " via automation"
 
 	// Step 6: create the commit object
 	slog.Info("creating commit", "message", message, "tree_sha", newTree.GetSHA())

@@ -43,6 +43,7 @@ func main() {
 		"repo", cfg.Repo,
 		"branch", cfg.Branch,
 		"file_count", len(cfg.Files),
+		"delete_file_count", len(cfg.DeleteFiles),
 		"max_retries", cfg.MaxRetries,
 		"log_level", cfg.LogLevel,
 		"app_id", cfg.AppID,
@@ -69,8 +70,12 @@ func main() {
 		slog.Info("file queued for commit", "src", fp.Src, "dest", fp.Dest)
 	}
 
+	for _, path := range cfg.DeleteFiles {
+		slog.Info("file queued for deletion", "path", path)
+	}
+
 	c := committer.New(client, cfg.Owner, cfg.Repo, cfg.Branch, cfg.MaxRetries)
-	commitSHA, err := c.CommitFiles(ctx, files)
+	commitSHA, err := c.CommitFiles(ctx, files, cfg.DeleteFiles)
 	if err != nil {
 		slog.Error("failed to commit files", "error", err)
 		os.Exit(1)
