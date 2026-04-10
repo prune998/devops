@@ -66,7 +66,7 @@ func ParseFrom(args []string, getenv func(string) string) (*Config, error) {
 	owner := fs.String("owner", envOr("GITHUB_REPO_ORG", ""), "Repo owner (org or user)")
 	repo := fs.String("repo", envOr("GITHUB_REPO_NAME", ""), "Repository name")
 	branch := fs.String("branch", envOr("GITHUB_REPO_BRANCH", ""), "Target branch")
-	maxRetriesStr := fs.String("max-retries", envOr("MAX_RETRIES", "5"), "Max API retry attempts")
+	maxRetriesStr := fs.String("max-retries", envOr("MAX_RETRIES", "5"), "Max retries per API call, 0 = no retries (default 5)")
 	logLevel := fs.String("log-level", envOr("LOG_LEVEL", "info"), "Log level: debug/info/warn/error")
 	fs.Var(&files, "file", "Repeatable src:dest file pair (e.g. ./local.yaml:path/in/repo.yaml)")
 

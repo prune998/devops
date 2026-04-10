@@ -49,7 +49,7 @@ func (c *Committer) CommitFiles(ctx context.Context, files []FilePair) (string, 
 	slog.Info("fetching branch ref",
 		"owner", c.owner, "repo", c.repo, "branch", c.branch)
 	var ref *github.Reference
-	if err := retry.Do(ctx, c.maxRetries, "get_ref", func() error {
+	if err := retry.Do(ctx, c.maxRetries+1, "get_ref", func() error {
 		var err error
 		ref, _, err = c.client.Git.GetRef(ctx, c.owner, c.repo, "refs/heads/"+c.branch)
 		return err
@@ -63,7 +63,7 @@ func (c *Committer) CommitFiles(ctx context.Context, files []FilePair) (string, 
 	// Step 2: resolve commit to its tree SHA
 	slog.Info("fetching base commit", "commit_sha", commitSHA)
 	var baseCommit *github.Commit
-	if err := retry.Do(ctx, c.maxRetries, "get_commit", func() error {
+	if err := retry.Do(ctx, c.maxRetries+1, "get_commit", func() error {
 		var err error
 		baseCommit, _, err = c.client.Git.GetCommit(ctx, c.owner, c.repo, commitSHA)
 		return err
@@ -87,7 +87,7 @@ func (c *Committer) CommitFiles(ctx context.Context, files []FilePair) (string, 
 		encoded := base64.StdEncoding.EncodeToString(content)
 		slog.Info("creating blob", "dest", fp.Dest, "bytes", len(content))
 		var blob *github.Blob
-		if err := retry.Do(ctx, c.maxRetries, "create_blob:"+fp.Dest, func() error {
+		if err := retry.Do(ctx, c.maxRetries+1, "create_blob:"+fp.Dest, func() error {
 			var err error
 			blob, _, err = c.client.Git.CreateBlob(ctx, c.owner, c.repo, &github.Blob{
 				Content:  github.Ptr(encoded),
@@ -111,7 +111,7 @@ func (c *Committer) CommitFiles(ctx context.Context, files []FilePair) (string, 
 	// Step 4: create a new tree from all blobs
 	slog.Info("creating tree", "base_tree_sha", treeSHA, "entry_count", len(treeEntries))
 	var newTree *github.Tree
-	if err := retry.Do(ctx, c.maxRetries, "create_tree", func() error {
+	if err := retry.Do(ctx, c.maxRetries+1, "create_tree", func() error {
 		var err error
 		newTree, _, err = c.client.Git.CreateTree(ctx, c.owner, c.repo, treeSHA, treeEntries)
 		return err
@@ -131,7 +131,7 @@ func (c *Committer) CommitFiles(ctx context.Context, files []FilePair) (string, 
 	// Step 6: create the commit object
 	slog.Info("creating commit", "message", message, "tree_sha", newTree.GetSHA())
 	var newCommit *github.Commit
-	if err := retry.Do(ctx, c.maxRetries, "create_commit", func() error {
+	if err := retry.Do(ctx, c.maxRetries+1, "create_commit", func() error {
 		var err error
 		newCommit, _, err = c.client.Git.CreateCommit(ctx, c.owner, c.repo, &github.Commit{
 			Message: github.Ptr(message),
@@ -147,10 +147,10 @@ func (c *Committer) CommitFiles(ctx context.Context, files []FilePair) (string, 
 
 	// Step 7: update the branch ref to point to the new commit
 	slog.Info("updating branch ref", "branch", c.branch, "commit_sha", newCommit.GetSHA())
-	if err := retry.Do(ctx, c.maxRetries, "update_ref", func() error {
+	if err := retry.Do(ctx, c.maxRetries+1, "update_ref", func() error {
 		_, _, err := c.client.Git.UpdateRef(ctx, c.owner, c.repo, &github.Reference{
 			Ref:    github.Ptr("refs/heads/" + c.branch),
-			Object: &github.GitObject{SHA: newCommit.SHA},
+			Object: &github.GitObject{SHA: github.Ptr(newCommit.GetSHA())},
 		}, false)
 		return err
 	}); err != nil {
