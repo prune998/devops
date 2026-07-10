@@ -1,9 +1,10 @@
 # go-github-graphql
 
 Lists all repositories in a GitHub organization that carry a given topic
-(default `argocd`), using GitHub App authentication and the GitHub GraphQL API
-v4 (`shurcooL/githubv4`). Each repository's full topic list is included in the
-output, and archived repositories can optionally be excluded. Results are
+(default `argocd`) **and** contain a `project-info.yaml` file at the root of
+their default branch, using GitHub App authentication and the GitHub GraphQL
+API v4 (`shurcooL/githubv4`). Each repository's full topic list is included in
+the output, and archived repositories can optionally be excluded. Results are
 printed as JSON to stdout; logs go to stderr, including the `X-RateLimit-*`
 response headers after each GraphQL query.
 

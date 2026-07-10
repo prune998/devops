@@ -13,6 +13,10 @@ import (
 	"github.com/shurcooL/githubv4"
 )
 
+// projectInfoExpression is the git revision:path expression used to detect the
+// required project-info.yaml file at the root of a repository's default branch.
+const projectInfoExpression = "HEAD:project-info.yaml"
+
 // Repository is a single repository result, shaped for JSON output.
 type Repository struct {
 	Name        string   `json:"name"`
@@ -101,10 +105,13 @@ func Search(ctx context.Context, client *githubv4.Client, org, topic string, exc
 		Search struct {
 			Nodes []struct {
 				Repository struct {
-					Name             string
-					URL              string
-					Description      string
-					IsArchived       bool
+					Name        string
+					URL         string
+					Description string
+					IsArchived  bool
+					ProjectInfo struct {
+						Typename string `graphql:"__typename"`
+					} `graphql:"object(expression: $file)"`
 					RepositoryTopics struct {
 						Nodes []struct {
 							Topic struct {
@@ -124,6 +131,7 @@ func Search(ctx context.Context, client *githubv4.Client, org, topic string, exc
 	variables := map[string]interface{}{
 		"q":     githubv4.String(SearchQuery(org, topic, excludeArchived)),
 		"after": (*githubv4.String)(nil),
+		"file":  githubv4.String(projectInfoExpression),
 	}
 
 	var repos []Repository
@@ -133,6 +141,13 @@ func Search(ctx context.Context, client *githubv4.Client, org, topic string, exc
 		}
 
 		for _, n := range query.Search.Nodes {
+			// Keep only repositories that contain project-info.yaml at the root
+			// of their default branch. A missing path resolves to a null object
+			// (empty __typename); a present file resolves to a Blob.
+			if n.Repository.ProjectInfo.Typename != "Blob" {
+				continue
+			}
+
 			topics := make([]string, 0, len(n.Repository.RepositoryTopics.Nodes))
 			for _, tn := range n.Repository.RepositoryTopics.Nodes {
 				topics = append(topics, tn.Topic.Name)
