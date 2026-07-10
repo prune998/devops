@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"strings"
 )
 
 // Config holds all resolved runtime configuration.
@@ -32,7 +33,7 @@ func ParseFrom(args []string, getenv func(string) string) (*Config, error) {
 	privateKey := fs.String("private-key", envOr("GITHUB_PRIVATE_KEY_PATH", ""), "Path to PEM private key file")
 	installationID := fs.String("installation-id", envOr("GITHUB_INSTALLATION_ID", ""), "App installation ID")
 	org := fs.String("org", envOr("GITHUB_REPO_ORG", ""), "GitHub organization to search")
-	topic := fs.String("topic", envOr("GITHUB_TOPIC", "argocd"), "Repository topic to filter by (default argocd)")
+	topic := fs.String("topic", envOr("GITHUB_TOPIC", "argocd"), "Repository topic to filter by")
 	logLevel := fs.String("log-level", envOr("LOG_LEVEL", "info"), "Log level: debug/info/warn/error")
 
 	if err := fs.Parse(args); err != nil {
@@ -54,10 +55,14 @@ func ParseFrom(args []string, getenv func(string) string) (*Config, error) {
 		{"--installation-id (GITHUB_INSTALLATION_ID)", cfg.InstallationID},
 		{"--org (GITHUB_REPO_ORG)", cfg.Org},
 	}
+	var missing []string
 	for _, r := range required {
 		if r.value == "" {
-			return nil, fmt.Errorf("required flag %s is not set", r.flag)
+			missing = append(missing, r.flag)
 		}
+	}
+	if len(missing) > 0 {
+		return nil, fmt.Errorf("required flags not set: %s", strings.Join(missing, ", "))
 	}
 
 	return cfg, nil

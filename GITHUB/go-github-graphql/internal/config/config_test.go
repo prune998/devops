@@ -1,6 +1,9 @@
 package config
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func env(m map[string]string) func(string) string {
 	return func(k string) string { return m[k] }
@@ -62,5 +65,14 @@ func TestParseFrom_MissingRequired(t *testing.T) {
 	_, err := ParseFrom([]string{"--app-id", "1"}, env(nil))
 	if err == nil {
 		t.Fatal("expected error for missing required fields")
+	}
+	if !strings.Contains(err.Error(), "required flags not set") {
+		t.Fatalf("expected required-flags error, got %q", err)
+	}
+	// All three still-missing required flags should be reported at once.
+	for _, want := range []string{"--private-key", "--installation-id", "--org"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Fatalf("expected error to mention %s, got %q", want, err)
+		}
 	}
 }
