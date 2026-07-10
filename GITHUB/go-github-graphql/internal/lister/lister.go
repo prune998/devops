@@ -3,6 +3,10 @@ package lister
 import (
 	"context"
 	"fmt"
+	"log/slog"
+	"net/http"
+	"sort"
+	"strings"
 
 	"github.com/beatlabs/github-auth/app/inst"
 	"github.com/beatlabs/github-auth/key"
@@ -11,19 +15,63 @@ import (
 
 // Repository is a single repository result, shaped for JSON output.
 type Repository struct {
-	Name        string `json:"name"`
-	URL         string `json:"url"`
-	Description string `json:"description"`
-	Archived    bool   `json:"archived"`
+	Name        string   `json:"name"`
+	URL         string   `json:"url"`
+	Description string   `json:"description"`
+	Archived    bool     `json:"archived"`
+	Topics      []string `json:"topics"`
 }
 
 // SearchQuery builds the GitHub search query string that matches all
-// repositories in org carrying the given topic.
-func SearchQuery(org, topic string) string {
-	return fmt.Sprintf("org:%s topic:%s", org, topic)
+// repositories in org carrying the given topic. When excludeArchived is true,
+// the archived:false qualifier is appended so archived repositories are
+// filtered out server-side.
+func SearchQuery(org, topic string, excludeArchived bool) string {
+	q := fmt.Sprintf("org:%s topic:%s", org, topic)
+	if excludeArchived {
+		q += " archived:false"
+	}
+	return q
 }
 
-// NewClient builds a GitHub App installation-authenticated GraphQL v4 client.
+// rateLimitTransport wraps an http.RoundTripper and logs GitHub's
+// X-RateLimit-* response headers after each request, so every GraphQL query
+// surfaces the current rate-limit state.
+type rateLimitTransport struct {
+	next http.RoundTripper
+}
+
+func (t *rateLimitTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	resp, err := t.next.RoundTrip(req)
+	if err != nil {
+		return resp, err
+	}
+	if attrs := rateLimitAttrs(resp.Header); len(attrs) > 0 {
+		slog.Info("github rate limit", attrs...)
+	}
+	return resp, nil
+}
+
+// rateLimitAttrs extracts X-RateLimit-* headers from h into a slog-style
+// key/value slice, sorted by header name for deterministic output.
+func rateLimitAttrs(h http.Header) []any {
+	var names []string
+	for name := range h {
+		if strings.HasPrefix(name, "X-Ratelimit-") {
+			names = append(names, name)
+		}
+	}
+	sort.Strings(names)
+
+	attrs := make([]any, 0, len(names)*2)
+	for _, name := range names {
+		attrs = append(attrs, name, h.Get(name))
+	}
+	return attrs
+}
+
+// NewClient builds a GitHub App installation-authenticated GraphQL v4 client
+// whose transport logs rate-limit headers after each request.
 func NewClient(ctx context.Context, appID, installationID, privateKeyPath string) (*githubv4.Client, error) {
 	k, err := key.FromFile(privateKeyPath)
 	if err != nil {
@@ -35,20 +83,35 @@ func NewClient(ctx context.Context, appID, installationID, privateKeyPath string
 		return nil, fmt.Errorf("creating installation config: %w", err)
 	}
 
-	return githubv4.NewClient(install.Client(ctx)), nil
+	httpClient := install.Client(ctx)
+	base := httpClient.Transport
+	if base == nil {
+		base = http.DefaultTransport
+	}
+	httpClient.Transport = &rateLimitTransport{next: base}
+
+	return githubv4.NewClient(httpClient), nil
 }
 
 // Search returns every repository in org carrying the given topic, paging
-// through all results.
-func Search(ctx context.Context, client *githubv4.Client, org, topic string) ([]Repository, error) {
+// through all results. When excludeArchived is true, archived repositories are
+// omitted.
+func Search(ctx context.Context, client *githubv4.Client, org, topic string, excludeArchived bool) ([]Repository, error) {
 	var query struct {
 		Search struct {
 			Nodes []struct {
 				Repository struct {
-					Name        string
-					URL         string
-					Description string
-					IsArchived  bool
+					Name             string
+					URL              string
+					Description      string
+					IsArchived       bool
+					RepositoryTopics struct {
+						Nodes []struct {
+							Topic struct {
+								Name string
+							}
+						}
+					} `graphql:"repositoryTopics(first: 100)"`
 				} `graphql:"... on Repository"`
 			}
 			PageInfo struct {
@@ -59,7 +122,7 @@ func Search(ctx context.Context, client *githubv4.Client, org, topic string) ([]
 	}
 
 	variables := map[string]interface{}{
-		"q":     githubv4.String(SearchQuery(org, topic)),
+		"q":     githubv4.String(SearchQuery(org, topic, excludeArchived)),
 		"after": (*githubv4.String)(nil),
 	}
 
@@ -70,11 +133,17 @@ func Search(ctx context.Context, client *githubv4.Client, org, topic string) ([]
 		}
 
 		for _, n := range query.Search.Nodes {
+			topics := make([]string, 0, len(n.Repository.RepositoryTopics.Nodes))
+			for _, tn := range n.Repository.RepositoryTopics.Nodes {
+				topics = append(topics, tn.Topic.Name)
+			}
+
 			repos = append(repos, Repository{
 				Name:        n.Repository.Name,
 				URL:         n.Repository.URL,
 				Description: n.Repository.Description,
 				Archived:    n.Repository.IsArchived,
+				Topics:      topics,
 			})
 		}
 

@@ -4,17 +4,19 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 )
 
 // Config holds all resolved runtime configuration.
 type Config struct {
-	AppID          string
-	PrivateKeyPath string
-	InstallationID string
-	Org            string
-	Topic          string
-	LogLevel       string
+	AppID           string
+	PrivateKeyPath  string
+	InstallationID  string
+	Org             string
+	Topic           string
+	LogLevel        string
+	ExcludeArchived bool
 }
 
 // ParseFrom parses configuration from args and an environment lookup function.
@@ -29,24 +31,35 @@ func ParseFrom(args []string, getenv func(string) string) (*Config, error) {
 		return def
 	}
 
+	envBool := func(key string, def bool) bool {
+		if v := getenv(key); v != "" {
+			if b, err := strconv.ParseBool(v); err == nil {
+				return b
+			}
+		}
+		return def
+	}
+
 	appID := fs.String("app-id", envOr("GITHUB_APP_ID", ""), "GitHub App ID")
 	privateKey := fs.String("private-key", envOr("GITHUB_PRIVATE_KEY_PATH", ""), "Path to PEM private key file")
 	installationID := fs.String("installation-id", envOr("GITHUB_INSTALLATION_ID", ""), "App installation ID")
 	org := fs.String("org", envOr("GITHUB_REPO_ORG", ""), "GitHub organization to search")
 	topic := fs.String("topic", envOr("GITHUB_TOPIC", "argocd"), "Repository topic to filter by")
 	logLevel := fs.String("log-level", envOr("LOG_LEVEL", "info"), "Log level: debug/info/warn/error")
+	excludeArchived := fs.Bool("exclude-archived", envBool("EXCLUDE_ARCHIVED", false), "Exclude archived repositories from results")
 
 	if err := fs.Parse(args); err != nil {
 		return nil, fmt.Errorf("parsing flags: %w", err)
 	}
 
 	cfg := &Config{
-		AppID:          *appID,
-		PrivateKeyPath: *privateKey,
-		InstallationID: *installationID,
-		Org:            *org,
-		Topic:          *topic,
-		LogLevel:       *logLevel,
+		AppID:           *appID,
+		PrivateKeyPath:  *privateKey,
+		InstallationID:  *installationID,
+		Org:             *org,
+		Topic:           *topic,
+		LogLevel:        *logLevel,
+		ExcludeArchived: *excludeArchived,
 	}
 
 	required := []struct{ flag, value string }{

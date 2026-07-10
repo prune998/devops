@@ -37,7 +37,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	repos, err := lister.Search(ctx, client, cfg.Org, cfg.Topic)
+	repos, err := lister.Search(ctx, client, cfg.Org, cfg.Topic, cfg.ExcludeArchived)
 	if err != nil {
 		slog.Error("failed to search repositories", "error", err)
 		os.Exit(1)

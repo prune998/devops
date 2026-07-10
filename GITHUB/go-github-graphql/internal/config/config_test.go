@@ -27,10 +27,10 @@ func TestParseFrom_FlagsProvided(t *testing.T) {
 
 func TestParseFrom_EnvFallback(t *testing.T) {
 	cfg, err := ParseFrom(nil, env(map[string]string{
-		"GITHUB_APP_ID":            "1",
-		"GITHUB_PRIVATE_KEY_PATH":  "/k.pem",
-		"GITHUB_INSTALLATION_ID":   "2",
-		"GITHUB_REPO_ORG":          "envorg",
+		"GITHUB_APP_ID":           "1",
+		"GITHUB_PRIVATE_KEY_PATH": "/k.pem",
+		"GITHUB_INSTALLATION_ID":  "2",
+		"GITHUB_REPO_ORG":         "envorg",
 	}))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -58,6 +58,46 @@ func TestParseFrom_FlagOverridesEnv(t *testing.T) {
 	}
 	if cfg.Org != "flagorg" {
 		t.Fatalf("expected flag to override env, got %q", cfg.Org)
+	}
+}
+
+func TestParseFrom_ExcludeArchived(t *testing.T) {
+	base := map[string]string{
+		"GITHUB_APP_ID":           "1",
+		"GITHUB_PRIVATE_KEY_PATH": "/k.pem",
+		"GITHUB_INSTALLATION_ID":  "2",
+		"GITHUB_REPO_ORG":         "org",
+	}
+
+	// Default: archived repos are included.
+	cfg, err := ParseFrom(nil, env(base))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg.ExcludeArchived {
+		t.Fatal("expected ExcludeArchived to default to false")
+	}
+
+	// Flag sets it.
+	cfg, err = ParseFrom([]string{"--exclude-archived"}, env(base))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !cfg.ExcludeArchived {
+		t.Fatal("expected --exclude-archived to set ExcludeArchived")
+	}
+
+	// Env var sets it.
+	envMap := map[string]string{"EXCLUDE_ARCHIVED": "true"}
+	for k, v := range base {
+		envMap[k] = v
+	}
+	cfg, err = ParseFrom(nil, env(envMap))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !cfg.ExcludeArchived {
+		t.Fatal("expected EXCLUDE_ARCHIVED=true to set ExcludeArchived")
 	}
 }
 
