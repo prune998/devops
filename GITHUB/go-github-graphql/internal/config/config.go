@@ -17,6 +17,7 @@ type Config struct {
 	Topic           string
 	LogLevel        string
 	ExcludeArchived bool
+	MaxRetries      int
 }
 
 // ParseFrom parses configuration from args and an environment lookup function.
@@ -47,9 +48,18 @@ func ParseFrom(args []string, getenv func(string) string) (*Config, error) {
 	topic := fs.String("topic", envOr("GITHUB_TOPIC", "argocd"), "Repository topic to filter by")
 	logLevel := fs.String("log-level", envOr("LOG_LEVEL", "info"), "Log level: debug/info/warn/error")
 	excludeArchived := fs.Bool("exclude-archived", envBool("EXCLUDE_ARCHIVED", false), "Exclude archived repositories from results")
+	maxRetriesStr := fs.String("max-retries", envOr("MAX_RETRIES", "5"), "Max retries when GitHub rate limiting is reached, 0 = no retries")
 
 	if err := fs.Parse(args); err != nil {
 		return nil, fmt.Errorf("parsing flags: %w", err)
+	}
+
+	maxRetries, err := strconv.Atoi(*maxRetriesStr)
+	if err != nil {
+		return nil, fmt.Errorf("invalid --max-retries value %q: %w", *maxRetriesStr, err)
+	}
+	if maxRetries < 0 {
+		return nil, fmt.Errorf("--max-retries must be >= 0, got %d", maxRetries)
 	}
 
 	cfg := &Config{
@@ -60,6 +70,7 @@ func ParseFrom(args []string, getenv func(string) string) (*Config, error) {
 		Topic:           *topic,
 		LogLevel:        *logLevel,
 		ExcludeArchived: *excludeArchived,
+		MaxRetries:      maxRetries,
 	}
 
 	required := []struct{ flag, value string }{

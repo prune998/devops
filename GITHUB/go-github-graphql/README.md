@@ -21,10 +21,15 @@ when both are set.
 | `--org`             | `GITHUB_REPO_ORG`         | yes      | —        |
 | `--topic`           | `GITHUB_TOPIC`            | no       | `argocd` |
 | `--exclude-archived`| `EXCLUDE_ARCHIVED`        | no       | `false`  |
+| `--max-retries`     | `MAX_RETRIES`             | no       | `5`      |
 | `--log-level`       | `LOG_LEVEL`               | no       | `info`   |
 
 Set `--exclude-archived` (or `EXCLUDE_ARCHIVED=true`) to omit archived
 repositories from the results.
+
+When GitHub rate limiting is reached, requests are retried up to
+`--max-retries` times, waiting until the limit resets (`X-RateLimit-Reset`)
+or honoring a `Retry-After` header. Set `--max-retries 0` to disable retries.
 
 ## Usage
 

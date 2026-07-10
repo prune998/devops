@@ -6,7 +6,9 @@ import (
 	"log/slog"
 	"net/http"
 	"sort"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/beatlabs/github-auth/app/inst"
 	"github.com/beatlabs/github-auth/key"
@@ -38,22 +40,83 @@ func SearchQuery(org, topic string, excludeArchived bool) string {
 	return q
 }
 
-// rateLimitTransport wraps an http.RoundTripper and logs GitHub's
-// X-RateLimit-* response headers after each request, so every GraphQL query
-// surfaces the current rate-limit state.
+// rateLimitTransport wraps an http.RoundTripper. It logs GitHub's
+// X-RateLimit-* response headers after each request (so every GraphQL query
+// surfaces the current rate-limit state) and retries requests rejected by
+// rate limiting, waiting until the limit resets, up to maxRetries times.
 type rateLimitTransport struct {
-	next http.RoundTripper
+	next       http.RoundTripper
+	maxRetries int
 }
 
 func (t *rateLimitTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	resp, err := t.next.RoundTrip(req)
-	if err != nil {
-		return resp, err
+	for attempt := 0; ; attempt++ {
+		resp, err := t.next.RoundTrip(req)
+		if err != nil {
+			return resp, err
+		}
+		if attrs := rateLimitAttrs(resp.Header); len(attrs) > 0 {
+			slog.Info("github rate limit", attrs...)
+		}
+
+		wait, limited := retryAfter(resp, time.Now())
+		if !limited || attempt >= t.maxRetries {
+			return resp, nil
+		}
+
+		// Body must be drained/closed and the request body reset before the
+		// transport can reissue the request.
+		resp.Body.Close()
+		if req.GetBody != nil {
+			body, gerr := req.GetBody()
+			if gerr != nil {
+				return resp, nil // cannot safely retry; surface the last response
+			}
+			req.Body = body
+		}
+
+		slog.Warn("github rate limit reached, waiting before retry",
+			"attempt", attempt+1, "max_retries", t.maxRetries, "wait", wait.String())
+
+		select {
+		case <-req.Context().Done():
+			return nil, req.Context().Err()
+		case <-time.After(wait):
+		}
 	}
-	if attrs := rateLimitAttrs(resp.Header); len(attrs) > 0 {
-		slog.Info("github rate limit", attrs...)
+}
+
+// retryAfter reports how long to wait before retrying a rate-limited response
+// and whether the response indicates rate limiting at all. It handles GitHub's
+// secondary limit (Retry-After, in seconds) and primary limit
+// (X-RateLimit-Remaining: 0, waiting until X-RateLimit-Reset). now is passed in
+// for testability.
+func retryAfter(resp *http.Response, now time.Time) (time.Duration, bool) {
+	if resp.StatusCode != http.StatusForbidden && resp.StatusCode != http.StatusTooManyRequests {
+		return 0, false
 	}
-	return resp, nil
+
+	// Secondary rate limit: explicit Retry-After delay in seconds.
+	if v := resp.Header.Get("Retry-After"); v != "" {
+		if secs, err := strconv.Atoi(v); err == nil && secs >= 0 {
+			return time.Duration(secs) * time.Second, true
+		}
+	}
+
+	// Primary rate limit: no budget left, wait until the reset time.
+	if resp.Header.Get("X-RateLimit-Remaining") == "0" {
+		if v := resp.Header.Get("X-RateLimit-Reset"); v != "" {
+			if epoch, err := strconv.ParseInt(v, 10, 64); err == nil {
+				wait := time.Unix(epoch, 0).Sub(now) + time.Second // small buffer past reset
+				if wait < 0 {
+					wait = 0
+				}
+				return wait, true
+			}
+		}
+	}
+
+	return 0, false
 }
 
 // rateLimitAttrs extracts X-RateLimit-* headers from h into a slog-style
@@ -75,8 +138,9 @@ func rateLimitAttrs(h http.Header) []any {
 }
 
 // NewClient builds a GitHub App installation-authenticated GraphQL v4 client
-// whose transport logs rate-limit headers after each request.
-func NewClient(ctx context.Context, appID, installationID, privateKeyPath string) (*githubv4.Client, error) {
+// whose transport logs rate-limit headers after each request and retries
+// rate-limited requests up to maxRetries times.
+func NewClient(ctx context.Context, appID, installationID, privateKeyPath string, maxRetries int) (*githubv4.Client, error) {
 	k, err := key.FromFile(privateKeyPath)
 	if err != nil {
 		return nil, fmt.Errorf("loading private key: %w", err)
@@ -92,7 +156,7 @@ func NewClient(ctx context.Context, appID, installationID, privateKeyPath string
 	if base == nil {
 		base = http.DefaultTransport
 	}
-	httpClient.Transport = &rateLimitTransport{next: base}
+	httpClient.Transport = &rateLimitTransport{next: base, maxRetries: maxRetries}
 
 	return githubv4.NewClient(httpClient), nil
 }

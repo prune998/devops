@@ -31,7 +31,7 @@ func main() {
 
 	ctx := context.Background()
 
-	client, err := lister.NewClient(ctx, cfg.AppID, cfg.InstallationID, cfg.PrivateKeyPath)
+	client, err := lister.NewClient(ctx, cfg.AppID, cfg.InstallationID, cfg.PrivateKeyPath, cfg.MaxRetries)
 	if err != nil {
 		slog.Error("failed to create GitHub client", "error", err)
 		os.Exit(1)

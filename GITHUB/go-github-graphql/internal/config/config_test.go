@@ -101,6 +101,43 @@ func TestParseFrom_ExcludeArchived(t *testing.T) {
 	}
 }
 
+func TestParseFrom_MaxRetries(t *testing.T) {
+	base := map[string]string{
+		"GITHUB_APP_ID":           "1",
+		"GITHUB_PRIVATE_KEY_PATH": "/k.pem",
+		"GITHUB_INSTALLATION_ID":  "2",
+		"GITHUB_REPO_ORG":         "org",
+	}
+
+	// Default is 5.
+	cfg, err := ParseFrom(nil, env(base))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg.MaxRetries != 5 {
+		t.Fatalf("expected default MaxRetries 5, got %d", cfg.MaxRetries)
+	}
+
+	// Flag overrides.
+	cfg, err = ParseFrom([]string{"--max-retries", "0"}, env(base))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg.MaxRetries != 0 {
+		t.Fatalf("expected MaxRetries 0, got %d", cfg.MaxRetries)
+	}
+
+	// Non-numeric value errors.
+	if _, err := ParseFrom([]string{"--max-retries", "lots"}, env(base)); err == nil {
+		t.Fatal("expected error for non-numeric --max-retries")
+	}
+
+	// Negative value errors.
+	if _, err := ParseFrom([]string{"--max-retries", "-1"}, env(base)); err == nil {
+		t.Fatal("expected error for negative --max-retries")
+	}
+}
+
 func TestParseFrom_MissingRequired(t *testing.T) {
 	_, err := ParseFrom([]string{"--app-id", "1"}, env(nil))
 	if err == nil {
