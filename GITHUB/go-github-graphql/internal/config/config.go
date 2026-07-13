@@ -18,6 +18,8 @@ type Config struct {
 	LogLevel        string
 	ExcludeArchived bool
 	MaxRetries      int
+	Limit           int
+	UseOrgEndpoint  bool
 	Quiet           bool
 }
 
@@ -50,6 +52,8 @@ func ParseFrom(args []string, getenv func(string) string) (*Config, error) {
 	logLevel := fs.String("log-level", envOr("LOG_LEVEL", "info"), "Log level: debug/info/warn/error")
 	excludeArchived := fs.Bool("exclude-archived", envBool("EXCLUDE_ARCHIVED", false), "Exclude archived repositories from results")
 	maxRetriesStr := fs.String("max-retries", envOr("MAX_RETRIES", "5"), "Max retries when GitHub rate limiting is reached, 0 = no retries")
+	limitStr := fs.String("limit", envOr("LIMIT", "0"), "Max number of repositories to fetch, 0 = no limit")
+	useOrgEndpoint := fs.Bool("use-org-endpoint", envBool("USE_ORG_ENDPOINT", false), "List via the GraphQL organization endpoint instead of the search endpoint")
 	quiet := fs.Bool("quiet", envBool("QUIET", false), "Quiet mode: suppress logs and repository output, print only HTTP request statistics")
 
 	if err := fs.Parse(args); err != nil {
@@ -64,6 +68,14 @@ func ParseFrom(args []string, getenv func(string) string) (*Config, error) {
 		return nil, fmt.Errorf("--max-retries must be >= 0, got %d", maxRetries)
 	}
 
+	limit, err := strconv.Atoi(*limitStr)
+	if err != nil {
+		return nil, fmt.Errorf("invalid --limit value %q: %w", *limitStr, err)
+	}
+	if limit < 0 {
+		return nil, fmt.Errorf("--limit must be >= 0, got %d", limit)
+	}
+
 	cfg := &Config{
 		AppID:           *appID,
 		PrivateKeyPath:  *privateKey,
@@ -73,6 +85,8 @@ func ParseFrom(args []string, getenv func(string) string) (*Config, error) {
 		LogLevel:        *logLevel,
 		ExcludeArchived: *excludeArchived,
 		MaxRetries:      maxRetries,
+		Limit:           limit,
+		UseOrgEndpoint:  *useOrgEndpoint,
 		Quiet:           *quiet,
 	}
 

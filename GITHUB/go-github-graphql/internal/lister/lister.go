@@ -13,7 +13,6 @@ import (
 
 	"github.com/beatlabs/github-auth/app/inst"
 	"github.com/beatlabs/github-auth/key"
-	"github.com/google/go-github/v89/github"
 	"github.com/shurcooL/githubv4"
 )
 
@@ -54,12 +53,12 @@ func (s *Stats) recordRateLimited() {
 
 // Repository is a single repository result, shaped for JSON output.
 type Repository struct {
-	Name        string   `json:"name"`
-	FullName    string   `json:"full_name"`
-	URL         string   `json:"url"`
-	Description string   `json:"description"`
-	Archived    bool     `json:"archived"`
-	Topics      []string `json:"topics"`
+	Name          string   `json:"name"`
+	NameWithOwner string   `json:"nameWithOwner"`
+	URL           string   `json:"url"`
+	Description   string   `json:"description"`
+	Archived      bool     `json:"archived"`
+	Topics        []string `json:"topics"`
 }
 
 // SearchQuery builds the GitHub search query string that matches all
@@ -218,30 +217,83 @@ func NewClient(ctx context.Context, appID, installationID, privateKeyPath string
 	return githubv4.NewClient(httpClient), stats, nil
 }
 
-// Search returns every repository in org carrying the given topic, paging
-// through all results. When excludeArchived is true, archived repositories are
-// omitted.
-func Search(ctx context.Context, client *githubv4.Client, org, topic string, excludeArchived bool) ([]Repository, error) {
+// repositoryNode is the shared shape of a repository as returned by both the
+// search and organization GraphQL endpoints. object(expression: $file) is used
+// to detect project-info.yaml and repositoryTopics carries the repo's topics.
+type repositoryNode struct {
+	Name          string
+	NameWithOwner string
+	URL           string
+	Description   string
+	IsArchived    bool
+	ProjectInfo   struct {
+		Typename string `graphql:"__typename"`
+	} `graphql:"object(expression: $file)"`
+	RepositoryTopics struct {
+		Nodes []struct {
+			Topic struct {
+				Name string
+			}
+		}
+	} `graphql:"repositoryTopics(first: 100)"`
+}
+
+// qualifies reports whether the node contains project-info.yaml at the root of
+// its default branch. A missing path resolves to a null object (empty
+// __typename); a present file resolves to a Blob.
+func (n repositoryNode) qualifies() bool {
+	return n.ProjectInfo.Typename == "Blob"
+}
+
+// topics returns the repository's topic names.
+func (n repositoryNode) topics() []string {
+	topics := make([]string, 0, len(n.RepositoryTopics.Nodes))
+	for _, tn := range n.RepositoryTopics.Nodes {
+		topics = append(topics, tn.Topic.Name)
+	}
+	return topics
+}
+
+// toRepository converts the node into the JSON-shaped Repository.
+func (n repositoryNode) toRepository() Repository {
+	return Repository{
+		Name:          n.Name,
+		NameWithOwner: n.NameWithOwner,
+		URL:           n.URL,
+		Description:   n.Description,
+		Archived:      n.IsArchived,
+		Topics:        n.topics(),
+	}
+}
+
+// sortByNameWithOwner sorts repos in place by NameWithOwner for deterministic,
+// alphabetical output.
+func sortByNameWithOwner(repos []Repository) {
+	sort.Slice(repos, func(i, j int) bool {
+		return repos[i].NameWithOwner < repos[j].NameWithOwner
+	})
+}
+
+// contains reports whether s is present in list.
+func contains(list []string, s string) bool {
+	for _, v := range list {
+		if v == s {
+			return true
+		}
+	}
+	return false
+}
+
+// Search returns every repository in org carrying the given topic, using the
+// GraphQL search endpoint and paging through all results. When excludeArchived
+// is true, archived repositories are omitted. When limit is greater than 0, at
+// most limit repositories are returned and paging stops once that many have
+// been collected. Results are sorted by NameWithOwner.
+func Search(ctx context.Context, client *githubv4.Client, org, topic string, excludeArchived bool, limit int) ([]Repository, error) {
 	var query struct {
 		Search struct {
 			Nodes []struct {
-				Repository struct {
-					Name          string
-					NameWithOwner githubv4.String
-					URL           string
-					Description   string
-					IsArchived    bool
-					ProjectInfo   struct {
-						Typename string `graphql:"__typename"`
-					} `graphql:"object(expression: $file)"`
-					RepositoryTopics struct {
-						Nodes []struct {
-							Topic struct {
-								Name string
-							}
-						}
-					} `graphql:"repositoryTopics(first: 100)"`
-				} `graphql:"... on Repository"`
+				Repository repositoryNode `graphql:"... on Repository"`
 			}
 			PageInfo struct {
 				EndCursor   githubv4.String
@@ -257,32 +309,22 @@ func Search(ctx context.Context, client *githubv4.Client, org, topic string, exc
 	}
 
 	var repos []Repository
+paging:
 	for {
 		if err := client.Query(ctx, &query, variables); err != nil {
 			return nil, fmt.Errorf("querying repositories: %w", err)
 		}
 
 		for _, n := range query.Search.Nodes {
-			// Keep only repositories that contain project-info.yaml at the root
-			// of their default branch. A missing path resolves to a null object
-			// (empty __typename); a present file resolves to a Blob.
-			if n.Repository.ProjectInfo.Typename != "Blob" {
+			if !n.Repository.qualifies() {
 				continue
 			}
 
-			topics := make([]string, 0, len(n.Repository.RepositoryTopics.Nodes))
-			for _, tn := range n.Repository.RepositoryTopics.Nodes {
-				topics = append(topics, tn.Topic.Name)
-			}
+			repos = append(repos, n.Repository.toRepository())
 
-			repos = append(repos, Repository{
-				Name:        n.Repository.Name,
-				FullName:    github.Ptr(string(n.NameWithOwner)),
-				URL:         n.Repository.URL,
-				Description: n.Repository.Description,
-				Archived:    n.Repository.IsArchived,
-				Topics:      topics,
-			})
+			if limit > 0 && len(repos) >= limit {
+				break paging
+			}
 		}
 
 		if !query.Search.PageInfo.HasNextPage {
@@ -290,6 +332,81 @@ func Search(ctx context.Context, client *githubv4.Client, org, topic string, exc
 		}
 		variables["after"] = githubv4.NewString(query.Search.PageInfo.EndCursor)
 	}
+
+	sortByNameWithOwner(repos)
+
+	return repos, nil
+}
+
+// SearchOrg returns every repository in org carrying the given topic, using the
+// GraphQL organization endpoint (organization.repositories) instead of the
+// search endpoint. The organization endpoint has no topic qualifier, so topic
+// filtering is applied client-side against each repository's topics. When
+// excludeArchived is true, archived repositories are filtered out server-side
+// via the connection's isArchived argument. When limit is greater than 0, at
+// most limit repositories are returned and paging stops once that many have
+// been collected. Results are sorted by NameWithOwner.
+func SearchOrg(ctx context.Context, client *githubv4.Client, org, topic string, excludeArchived bool, limit int) ([]Repository, error) {
+	var query struct {
+		Organization struct {
+			Repositories struct {
+				Nodes    []repositoryNode
+				PageInfo struct {
+					EndCursor   githubv4.String
+					HasNextPage bool
+				}
+			} `graphql:"repositories(first: 100, after: $after, isArchived: $isArchived, privacy: PRIVATE, orderBy: {field: NAME, direction: ASC})"`
+		} `graphql:"organization(login: $org)"`
+	}
+
+	// isArchived is nullable: nil means no filtering, a non-nil false filters
+	// archived repositories out server-side.
+	var isArchived *githubv4.Boolean
+	if excludeArchived {
+		v := githubv4.Boolean(false)
+		isArchived = &v
+	}
+
+	variables := map[string]interface{}{
+		"org":        githubv4.String(org),
+		"after":      (*githubv4.String)(nil),
+		"file":       githubv4.String(projectInfoExpression),
+		"isArchived": isArchived,
+	}
+
+	var repos []Repository
+paging:
+	for {
+		if err := client.Query(ctx, &query, variables); err != nil {
+			return nil, fmt.Errorf("querying organization repositories: %w", err)
+		}
+
+		for _, n := range query.Organization.Repositories.Nodes {
+			if !n.qualifies() {
+				continue
+			}
+
+			repo := n.toRepository()
+
+			// The organization endpoint cannot filter by topic, so enforce it here.
+			if topic != "" && !contains(repo.Topics, topic) {
+				continue
+			}
+
+			repos = append(repos, repo)
+
+			if limit > 0 && len(repos) >= limit {
+				break paging
+			}
+		}
+
+		if !query.Organization.Repositories.PageInfo.HasNextPage {
+			break
+		}
+		variables["after"] = githubv4.NewString(query.Organization.Repositories.PageInfo.EndCursor)
+	}
+
+	sortByNameWithOwner(repos)
 
 	return repos, nil
 }
