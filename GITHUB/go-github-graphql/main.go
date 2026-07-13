@@ -27,11 +27,23 @@ func main() {
 	case "error":
 		level = slog.LevelError
 	}
+	// The rate-limit header logger tracks the configured level in normal mode
+	// but is forced to Info in quiet mode so every GitHub API call's headers
+	// stay visible even though general logging is silenced.
+	headerLevel := level
+
+	// Quiet mode silences all but error logs so only the statistics output,
+	// the per-request API headers, and any fatal error reach the operator.
+	if cfg.Quiet {
+		level = slog.LevelError
+		headerLevel = slog.LevelInfo
+	}
 	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{Level: level})))
+	headerLogger := slog.New(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{Level: headerLevel}))
 
 	ctx := context.Background()
 
-	client, err := lister.NewClient(ctx, cfg.AppID, cfg.InstallationID, cfg.PrivateKeyPath, cfg.MaxRetries)
+	client, stats, err := lister.NewClient(ctx, cfg.AppID, cfg.InstallationID, cfg.PrivateKeyPath, cfg.MaxRetries, headerLogger)
 	if err != nil {
 		slog.Error("failed to create GitHub client", "error", err)
 		os.Exit(1)
@@ -45,16 +57,23 @@ func main() {
 
 	slog.Info("search complete", "org", cfg.Org, "topic", cfg.Topic, "count", len(repos))
 
+	// A single JSON document carries the results and the GitHub API request
+	// statistics. In quiet mode the repository listing is omitted, but the rest
+	// of the document (including the statistics) is still emitted.
 	output := struct {
 		Org          string              `json:"org"`
 		Topic        string              `json:"topic"`
 		Count        int                 `json:"count"`
-		Repositories []lister.Repository `json:"repositories"`
+		Repositories []lister.Repository `json:"repositories,omitempty"`
+		Stats        *lister.Stats       `json:"stats"`
 	}{
-		Org:          cfg.Org,
-		Topic:        cfg.Topic,
-		Count:        len(repos),
-		Repositories: repos,
+		Org:   cfg.Org,
+		Topic: cfg.Topic,
+		Count: len(repos),
+		Stats: stats,
+	}
+	if !cfg.Quiet {
+		output.Repositories = repos
 	}
 
 	enc := json.NewEncoder(os.Stdout)

@@ -10,10 +10,11 @@ use (
 	./CLOUD/GCP/go-api-compute
 	./CLOUD/GCP/go-cloud-function
 	./CLOUD/GCP/gsm-editor
-	./CLOUD/GCP/pubsub-tester
 	./CLOUD/GCP/pubsub-publish
+	./CLOUD/GCP/pubsub-tester
 	./CLOUD/GCP/stackdriver-monitoring
 	./GITHUB/go-git-app-auth-test
+	./GITHUB/go-github-api
 	./GITHUB/go-github-app-auth-test
 	./GITHUB/go-github-graphql
 	./GOLANG/boilerplate

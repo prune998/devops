@@ -1,8 +1,11 @@
 package lister
 
 import (
+	"bytes"
+	"log/slog"
 	"net/http"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 )
@@ -39,13 +42,106 @@ func TestRateLimitAttrs(t *testing.T) {
 	h.Set("Content-Type", "application/json")
 
 	got := rateLimitAttrs(h)
+	// X-Ratelimit-Reset is rendered as a UTC-4 timestamp; 1700000000 is
+	// 2023-11-14 22:13:20 UTC, i.e. 18:13:20 at UTC-4.
 	want := []any{
 		"X-Ratelimit-Limit", "5000",
 		"X-Ratelimit-Remaining", "4999",
-		"X-Ratelimit-Reset", "1700000000",
+		"X-Ratelimit-Reset", "2023-11-14 18:13:20 UTC-4",
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("rateLimitAttrs = %v, want %v", got, want)
+	}
+}
+
+func TestRateLimitAttrs_ResetNonNumeric(t *testing.T) {
+	// A non-numeric reset value is passed through unchanged rather than dropped.
+	h := http.Header{}
+	h.Set("X-RateLimit-Reset", "not-a-number")
+
+	got := rateLimitAttrs(h)
+	want := []any{"X-Ratelimit-Reset", "not-a-number"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("rateLimitAttrs = %v, want %v", got, want)
+	}
+}
+
+func TestStatsRecord(t *testing.T) {
+	s := &Stats{}
+	s.record(200)
+	s.record(200)
+	s.record(403)
+	s.recordRateLimited()
+
+	if s.Requests != 3 {
+		t.Fatalf("Requests = %d, want 3", s.Requests)
+	}
+	if s.RateLimited != 1 {
+		t.Fatalf("RateLimited = %d, want 1", s.RateLimited)
+	}
+	if s.StatusCounts[200] != 2 || s.StatusCounts[403] != 1 {
+		t.Fatalf("StatusCounts = %v, want {200:2, 403:1}", s.StatusCounts)
+	}
+}
+
+// stubRoundTripper returns a canned response for every request.
+type stubRoundTripper struct {
+	resp *http.Response
+}
+
+func (s stubRoundTripper) RoundTrip(*http.Request) (*http.Response, error) {
+	// A fresh body per call so the transport can drain/close it on retries.
+	r := *s.resp
+	r.Body = http.NoBody
+	return &r, nil
+}
+
+func TestTransportRecordsStats(t *testing.T) {
+	stats := &Stats{}
+	tr := &rateLimitTransport{
+		next:       stubRoundTripper{resp: &http.Response{StatusCode: http.StatusOK, Header: http.Header{}}},
+		maxRetries: 0,
+		stats:      stats,
+		logger:     slog.Default(),
+	}
+
+	req, _ := http.NewRequest(http.MethodGet, "https://api.github.com/graphql", nil)
+	if _, err := tr.RoundTrip(req); err != nil {
+		t.Fatalf("RoundTrip error: %v", err)
+	}
+
+	if stats.Requests != 1 || stats.StatusCounts[http.StatusOK] != 1 {
+		t.Fatalf("stats = %+v, want 1 request with a 200", stats)
+	}
+	if stats.RateLimited != 0 {
+		t.Fatalf("RateLimited = %d, want 0", stats.RateLimited)
+	}
+}
+
+func TestTransportLogsHeaders(t *testing.T) {
+	// The transport's dedicated logger emits the rate-limit headers regardless
+	// of the global logger's level, so API-call headers survive quiet mode.
+	var buf bytes.Buffer
+	logger := slog.New(slog.NewJSONHandler(&buf, &slog.HandlerOptions{Level: slog.LevelInfo}))
+
+	h := http.Header{}
+	h.Set("X-RateLimit-Limit", "5000")
+	h.Set("X-RateLimit-Remaining", "4999")
+
+	tr := &rateLimitTransport{
+		next:       stubRoundTripper{resp: &http.Response{StatusCode: http.StatusOK, Header: h}},
+		maxRetries: 0,
+		stats:      &Stats{},
+		logger:     logger,
+	}
+
+	req, _ := http.NewRequest(http.MethodGet, "https://api.github.com/graphql", nil)
+	if _, err := tr.RoundTrip(req); err != nil {
+		t.Fatalf("RoundTrip error: %v", err)
+	}
+
+	if !strings.Contains(buf.String(), "github rate limit") {
+		t.Fatalf("expected rate-limit headers to be logged, got %q", buf.String())
 	}
 }
 

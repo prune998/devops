@@ -8,6 +8,7 @@ require (
 )
 
 require (
+	github.com/google/go-cmp v0.7.0 // indirect
 	github.com/shurcooL/graphql v0.0.0-20240915155400-7ee5256398cf // indirect
-	golang.org/x/oauth2 v0.21.0 // indirect
+	golang.org/x/oauth2 v0.27.0 // indirect
 )

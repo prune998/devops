@@ -8,10 +8,12 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/beatlabs/github-auth/app/inst"
 	"github.com/beatlabs/github-auth/key"
+	"github.com/google/go-github/v89/github"
 	"github.com/shurcooL/githubv4"
 )
 
@@ -19,9 +21,41 @@ import (
 // required project-info.yaml file at the root of a repository's default branch.
 const projectInfoExpression = "HEAD:project-info.yaml"
 
+// resetZone is the fixed UTC-4 zone used to render X-RateLimit-Reset timestamps
+// as human-readable local times instead of raw epoch seconds.
+var resetZone = time.FixedZone("UTC-4", -4*60*60)
+
+// Stats accumulates counts describing every HTTP request the client makes to
+// the GitHub API. It is safe for concurrent use.
+type Stats struct {
+	mu           sync.Mutex
+	Requests     int         `json:"requests"`      // total HTTP requests issued (including retries)
+	RateLimited  int         `json:"rate_limited"`  // requests that hit rate limiting and were retried
+	StatusCounts map[int]int `json:"status_counts"` // number of responses per HTTP status code
+}
+
+// record notes a completed HTTP response with the given status code.
+func (s *Stats) record(status int) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.Requests++
+	if s.StatusCounts == nil {
+		s.StatusCounts = make(map[int]int)
+	}
+	s.StatusCounts[status]++
+}
+
+// recordRateLimited notes that a request was rate limited and will be retried.
+func (s *Stats) recordRateLimited() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.RateLimited++
+}
+
 // Repository is a single repository result, shaped for JSON output.
 type Repository struct {
 	Name        string   `json:"name"`
+	FullName    string   `json:"full_name"`
 	URL         string   `json:"url"`
 	Description string   `json:"description"`
 	Archived    bool     `json:"archived"`
@@ -47,6 +81,8 @@ func SearchQuery(org, topic string, excludeArchived bool) string {
 type rateLimitTransport struct {
 	next       http.RoundTripper
 	maxRetries int
+	stats      *Stats
+	logger     *slog.Logger
 }
 
 func (t *rateLimitTransport) RoundTrip(req *http.Request) (*http.Response, error) {
@@ -55,14 +91,16 @@ func (t *rateLimitTransport) RoundTrip(req *http.Request) (*http.Response, error
 		if err != nil {
 			return resp, err
 		}
+		t.stats.record(resp.StatusCode)
 		if attrs := rateLimitAttrs(resp.Header); len(attrs) > 0 {
-			slog.Info("github rate limit", attrs...)
+			t.logger.Info("github rate limit", attrs...)
 		}
 
 		wait, limited := retryAfter(resp, time.Now())
 		if !limited || attempt >= t.maxRetries {
 			return resp, nil
 		}
+		t.stats.recordRateLimited()
 
 		// Body must be drained/closed and the request body reset before the
 		// transport can reissue the request.
@@ -75,7 +113,7 @@ func (t *rateLimitTransport) RoundTrip(req *http.Request) (*http.Response, error
 			req.Body = body
 		}
 
-		slog.Warn("github rate limit reached, waiting before retry",
+		t.logger.Warn("github rate limit reached, waiting before retry",
 			"attempt", attempt+1, "max_retries", t.maxRetries, "wait", wait.String())
 
 		select {
@@ -132,23 +170,41 @@ func rateLimitAttrs(h http.Header) []any {
 
 	attrs := make([]any, 0, len(names)*2)
 	for _, name := range names {
-		attrs = append(attrs, name, h.Get(name))
+		value := h.Get(name)
+		// Render the reset time as a human-readable UTC-4 timestamp rather than
+		// the raw epoch seconds GitHub sends.
+		if name == "X-Ratelimit-Reset" {
+			if epoch, err := strconv.ParseInt(value, 10, 64); err == nil {
+				value = time.Unix(epoch, 0).In(resetZone).Format("2006-01-02 15:04:05 MST")
+			}
+		}
+		attrs = append(attrs, name, value)
 	}
 	return attrs
 }
 
 // NewClient builds a GitHub App installation-authenticated GraphQL v4 client
 // whose transport logs rate-limit headers after each request and retries
-// rate-limited requests up to maxRetries times.
-func NewClient(ctx context.Context, appID, installationID, privateKeyPath string, maxRetries int) (*githubv4.Client, error) {
+// rate-limited requests up to maxRetries times. The returned Stats accumulates
+// request counts for every call the client makes to the GitHub API.
+//
+// logger receives the per-request rate-limit header logs and retry notices; it
+// is kept separate from the global logger so those API-call details can stay
+// visible even when general logging is silenced (e.g. quiet mode). A nil logger
+// falls back to slog.Default().
+func NewClient(ctx context.Context, appID, installationID, privateKeyPath string, maxRetries int, logger *slog.Logger) (*githubv4.Client, *Stats, error) {
+	if logger == nil {
+		logger = slog.Default()
+	}
+
 	k, err := key.FromFile(privateKeyPath)
 	if err != nil {
-		return nil, fmt.Errorf("loading private key: %w", err)
+		return nil, nil, fmt.Errorf("loading private key: %w", err)
 	}
 
 	install, err := inst.NewConfig(appID, installationID, k)
 	if err != nil {
-		return nil, fmt.Errorf("creating installation config: %w", err)
+		return nil, nil, fmt.Errorf("creating installation config: %w", err)
 	}
 
 	httpClient := install.Client(ctx)
@@ -156,9 +212,10 @@ func NewClient(ctx context.Context, appID, installationID, privateKeyPath string
 	if base == nil {
 		base = http.DefaultTransport
 	}
-	httpClient.Transport = &rateLimitTransport{next: base, maxRetries: maxRetries}
+	stats := &Stats{}
+	httpClient.Transport = &rateLimitTransport{next: base, maxRetries: maxRetries, stats: stats, logger: logger}
 
-	return githubv4.NewClient(httpClient), nil
+	return githubv4.NewClient(httpClient), stats, nil
 }
 
 // Search returns every repository in org carrying the given topic, paging
@@ -169,11 +226,12 @@ func Search(ctx context.Context, client *githubv4.Client, org, topic string, exc
 		Search struct {
 			Nodes []struct {
 				Repository struct {
-					Name        string
-					URL         string
-					Description string
-					IsArchived  bool
-					ProjectInfo struct {
+					Name          string
+					NameWithOwner githubv4.String
+					URL           string
+					Description   string
+					IsArchived    bool
+					ProjectInfo   struct {
 						Typename string `graphql:"__typename"`
 					} `graphql:"object(expression: $file)"`
 					RepositoryTopics struct {
@@ -219,6 +277,7 @@ func Search(ctx context.Context, client *githubv4.Client, org, topic string, exc
 
 			repos = append(repos, Repository{
 				Name:        n.Repository.Name,
+				FullName:    github.Ptr(string(n.NameWithOwner)),
 				URL:         n.Repository.URL,
 				Description: n.Repository.Description,
 				Archived:    n.Repository.IsArchived,

@@ -7,7 +7,7 @@
 
 Replace the hand-rolled REST calls in `internal/lister/lister.go` with the
 [`google/go-github`](https://github.com/google/go-github) library (pinned to
-`v75`), while preserving all existing behavior: CLI flags, JSON output shape,
+`v89`), while preserving all existing behavior: CLI flags, JSON output shape,
 rate-limit logging, retry-with-wait, request counting, and the
 `project-info.yaml` filter.
 
@@ -24,7 +24,7 @@ and the emitted JSON document are unchanged.
   the transport is retained to preserve header logging, `--max-retries`
   retry-with-wait, and the request counter. The go-github client is wired on
   top of the same installation-authenticated `*http.Client`.
-- **Version:** `github.com/google/go-github/v75`.
+- **Version:** `github.com/google/go-github/v89`.
 
 ## Changes
 

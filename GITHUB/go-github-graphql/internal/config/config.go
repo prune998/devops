@@ -18,6 +18,7 @@ type Config struct {
 	LogLevel        string
 	ExcludeArchived bool
 	MaxRetries      int
+	Quiet           bool
 }
 
 // ParseFrom parses configuration from args and an environment lookup function.
@@ -49,6 +50,7 @@ func ParseFrom(args []string, getenv func(string) string) (*Config, error) {
 	logLevel := fs.String("log-level", envOr("LOG_LEVEL", "info"), "Log level: debug/info/warn/error")
 	excludeArchived := fs.Bool("exclude-archived", envBool("EXCLUDE_ARCHIVED", false), "Exclude archived repositories from results")
 	maxRetriesStr := fs.String("max-retries", envOr("MAX_RETRIES", "5"), "Max retries when GitHub rate limiting is reached, 0 = no retries")
+	quiet := fs.Bool("quiet", envBool("QUIET", false), "Quiet mode: suppress logs and repository output, print only HTTP request statistics")
 
 	if err := fs.Parse(args); err != nil {
 		return nil, fmt.Errorf("parsing flags: %w", err)
@@ -71,6 +73,7 @@ func ParseFrom(args []string, getenv func(string) string) (*Config, error) {
 		LogLevel:        *logLevel,
 		ExcludeArchived: *excludeArchived,
 		MaxRetries:      maxRetries,
+		Quiet:           *quiet,
 	}
 
 	required := []struct{ flag, value string }{

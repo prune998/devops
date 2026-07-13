@@ -138,6 +138,46 @@ func TestParseFrom_MaxRetries(t *testing.T) {
 	}
 }
 
+func TestParseFrom_Quiet(t *testing.T) {
+	base := map[string]string{
+		"GITHUB_APP_ID":           "1",
+		"GITHUB_PRIVATE_KEY_PATH": "/k.pem",
+		"GITHUB_INSTALLATION_ID":  "2",
+		"GITHUB_REPO_ORG":         "org",
+	}
+
+	// Default: quiet is off.
+	cfg, err := ParseFrom(nil, env(base))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg.Quiet {
+		t.Fatal("expected Quiet to default to false")
+	}
+
+	// Flag sets it.
+	cfg, err = ParseFrom([]string{"--quiet"}, env(base))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !cfg.Quiet {
+		t.Fatal("expected --quiet to set Quiet")
+	}
+
+	// Env var sets it.
+	envMap := map[string]string{"QUIET": "true"}
+	for k, v := range base {
+		envMap[k] = v
+	}
+	cfg, err = ParseFrom(nil, env(envMap))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !cfg.Quiet {
+		t.Fatal("expected QUIET=true to set Quiet")
+	}
+}
+
 func TestParseFrom_MissingRequired(t *testing.T) {
 	_, err := ParseFrom([]string{"--app-id", "1"}, env(nil))
 	if err == nil {

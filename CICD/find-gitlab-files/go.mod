@@ -4,17 +4,17 @@ go 1.23.4
 
 require (
 	github.com/hashicorp/go-retryablehttp v0.7.7
-	github.com/k0kubun/pp v3.0.1+incompatible
-	gitlab.com/gitlab-org/api/client-go v0.119.0
+	gitlab.com/gitlab-org/api/client-go v0.123.0
 )
 
 require (
-	github.com/google/go-querystring v1.1.0 // indirect
+	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
+	github.com/google/go-cmp v0.7.0 // indirect
+	github.com/google/go-querystring v1.2.0 // indirect
 	github.com/hashicorp/go-cleanhttp v0.5.2 // indirect
-	github.com/k0kubun/colorstring v0.0.0-20150214042306-9440f1994b88 // indirect
-	github.com/mattn/go-colorable v0.1.13 // indirect
-	github.com/mattn/go-isatty v0.0.20 // indirect
-	golang.org/x/oauth2 v0.24.0 // indirect
-	golang.org/x/sys v0.20.0 // indirect
-	golang.org/x/time v0.8.0 // indirect
+	github.com/mattn/go-colorable v0.1.14 // indirect
+	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
+	golang.org/x/oauth2 v0.27.0 // indirect
+	golang.org/x/sys v0.30.0 // indirect
+	golang.org/x/time v0.10.0 // indirect
 )
