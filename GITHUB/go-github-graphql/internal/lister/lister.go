@@ -99,10 +99,22 @@ func (t *rateLimitTransport) RoundTrip(req *http.Request) (*http.Response, error
 		}
 
 		wait, limited := retryAfter(resp, time.Now())
-		if !limited || attempt >= t.maxRetries {
+		reason := "rate limit"
+		if !limited {
+			// Transient server errors (e.g. 502 Bad Gateway) from the GraphQL API
+			// are retried with a simple backoff.
+			if w, ok := serverErrorRetry(resp, attempt); ok {
+				wait, reason = w, "server error"
+			} else {
+				return resp, nil
+			}
+		}
+		if attempt >= t.maxRetries {
 			return resp, nil
 		}
-		t.stats.recordRateLimited()
+		if limited {
+			t.stats.recordRateLimited()
+		}
 
 		// Body must be drained/closed and the request body reset before the
 		// transport can reissue the request.
@@ -115,7 +127,7 @@ func (t *rateLimitTransport) RoundTrip(req *http.Request) (*http.Response, error
 			req.Body = body
 		}
 
-		t.logger.Warn("github rate limit reached, waiting before retry",
+		t.logger.Warn("retrying github request", "reason", reason, "status", resp.StatusCode,
 			"attempt", attempt+1, "max_retries", t.maxRetries, "wait", wait.String())
 
 		select {
@@ -157,6 +169,21 @@ func retryAfter(resp *http.Response, now time.Time) (time.Duration, bool) {
 	}
 
 	return 0, false
+}
+
+// serverErrorBackoff is the base wait between retries of a transient server
+// error; the actual wait scales with the attempt number.
+const serverErrorBackoff = 2 * time.Second
+
+// serverErrorRetry reports whether resp is a transient server error worth
+// retrying (a 502 Bad Gateway from the GraphQL API) and how long to wait
+// beforehand. The wait grows with the attempt number for a simple linear
+// backoff.
+func serverErrorRetry(resp *http.Response, attempt int) (time.Duration, bool) {
+	if resp.StatusCode != http.StatusBadGateway {
+		return 0, false
+	}
+	return time.Duration(attempt+1) * serverErrorBackoff, true
 }
 
 // rateLimitAttrs extracts X-RateLimit-* headers from h into a slog-style

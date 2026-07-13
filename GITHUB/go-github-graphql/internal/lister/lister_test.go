@@ -225,3 +225,51 @@ func TestRetryAfter(t *testing.T) {
 		})
 	}
 }
+
+func TestServerErrorRetry(t *testing.T) {
+	tests := []struct {
+		name      string
+		status    int
+		attempt   int
+		wantWait  time.Duration
+		wantRetry bool
+	}{
+		{
+			name:      "502 retried on first attempt",
+			status:    http.StatusBadGateway,
+			attempt:   0,
+			wantWait:  serverErrorBackoff,
+			wantRetry: true,
+		},
+		{
+			name:      "502 backoff grows with attempt",
+			status:    http.StatusBadGateway,
+			attempt:   2,
+			wantWait:  3 * serverErrorBackoff,
+			wantRetry: true,
+		},
+		{
+			name:      "200 is not retried",
+			status:    http.StatusOK,
+			attempt:   0,
+			wantWait:  0,
+			wantRetry: false,
+		},
+		{
+			name:      "503 is not retried",
+			status:    http.StatusServiceUnavailable,
+			attempt:   0,
+			wantWait:  0,
+			wantRetry: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotWait, gotRetry := serverErrorRetry(resp(tt.status, nil), tt.attempt)
+			if gotWait != tt.wantWait || gotRetry != tt.wantRetry {
+				t.Fatalf("serverErrorRetry = (%v, %v), want (%v, %v)", gotWait, gotRetry, tt.wantWait, tt.wantRetry)
+			}
+		})
+	}
+}
