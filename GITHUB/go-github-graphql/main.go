@@ -61,20 +61,25 @@ func main() {
 
 	slog.Info("search complete", "org", cfg.Org, "topic", cfg.Topic, "count", len(repos))
 
+	private, internal := visibilitySplit(repos)
 	// A single JSON document carries the results and the GitHub API request
 	// statistics. In quiet mode the repository listing is omitted, but the rest
 	// of the document (including the statistics) is still emitted.
 	output := struct {
-		Org          string              `json:"org"`
-		Topic        string              `json:"topic"`
-		Count        int                 `json:"count"`
-		Repositories []lister.Repository `json:"repositories,omitempty"`
-		Stats        *lister.Stats       `json:"stats"`
+		Org           string              `json:"org"`
+		Topic         string              `json:"topic"`
+		Count         int                 `json:"count"`
+		PrivateCount  int                 `json:"private_count"`
+		InternalCount int                 `json:"internal_count"`
+		Repositories  []lister.Repository `json:"repositories,omitempty"`
+		Stats         *lister.Stats       `json:"stats"`
 	}{
-		Org:   cfg.Org,
-		Topic: cfg.Topic,
-		Count: len(repos),
-		Stats: stats,
+		Org:           cfg.Org,
+		Topic:         cfg.Topic,
+		Count:         len(repos),
+		PrivateCount:  private,
+		InternalCount: internal,
+		Stats:         stats,
 	}
 	if !cfg.Quiet {
 		output.Repositories = repos
@@ -86,4 +91,19 @@ func main() {
 		slog.Error("failed to encode JSON output", "error", err)
 		os.Exit(1)
 	}
+}
+
+func visibilitySplit(repos []lister.Repository) (int, int) {
+	var private, internal int
+
+	for _, repo := range repos {
+		switch repo.Visibility {
+		case "PRIVATE":
+			private++
+
+		case "INTERNAL":
+			internal++
+		}
+	}
+	return private, internal
 }

@@ -57,8 +57,11 @@ type Repository struct {
 	NameWithOwner string   `json:"nameWithOwner"`
 	URL           string   `json:"url"`
 	Description   string   `json:"description"`
+	Visibility    string   `json:"visibility"`
 	Archived      bool     `json:"archived"`
 	Topics        []string `json:"topics"`
+	Owner         string   `json:"owner"`
+	DefaultBranch string   `json:"default_branch"`
 }
 
 // SearchQuery builds the GitHub search query string that matches all
@@ -221,12 +224,15 @@ func NewClient(ctx context.Context, appID, installationID, privateKeyPath string
 // search and organization GraphQL endpoints. object(expression: $file) is used
 // to detect project-info.yaml and repositoryTopics carries the repo's topics.
 type repositoryNode struct {
-	Name          string
-	NameWithOwner string
-	URL           string
-	Description   string
-	IsArchived    bool
-	ProjectInfo   struct {
+	Name             string
+	NameWithOwner    string
+	URL              string
+	Description      string
+	Visibility       string
+	IsArchived       bool
+	Owner            struct{ Login githubv4.String }
+	DefaultBranchRef struct{ Name githubv4.String }
+	ProjectInfo      struct {
 		Typename string `graphql:"__typename"`
 	} `graphql:"object(expression: $file)"`
 	RepositoryTopics struct {
@@ -263,6 +269,9 @@ func (n repositoryNode) toRepository() Repository {
 		Description:   n.Description,
 		Archived:      n.IsArchived,
 		Topics:        n.topics(),
+		Visibility:    n.Visibility,
+		Owner:         string(n.Owner.Login),
+		DefaultBranch: string(n.DefaultBranchRef.Name),
 	}
 }
 
